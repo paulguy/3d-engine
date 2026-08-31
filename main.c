@@ -61,25 +61,25 @@ int main(int argc, char **argv) {
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 
     if(!SDL_Init(SDL_INIT_VIDEO)) {
-        logp("Couldn't initialize SDL.\n");
+        LOG("Couldn't initialize SDL.\n");
         goto error;
     }
 
-    window = SDL_CreateWindow("engine", 640, 480, 0);
+    window = SDL_CreateWindow("engine", 200, 202, 0);
     if(window == NULL) {
-        logp("Failed to create window: %s\n", SDL_GetError());
+        LOG("Failed to create window: %s\n", SDL_GetError());
         goto error_init;
     }
 
     win_surf = SDL_GetWindowSurface(window);
     if(win_surf == NULL) {
-        logp("Failed to get window surface: %s\n", SDL_GetError());
+        LOG("Failed to get window surface: %s\n", SDL_GetError());
         goto error_init;
     }
 
     surface = SDL_CreateSurface(win_surf->w, win_surf->h, SDL_PIXELFORMAT_INDEX8);
     if(surface == NULL) {
-        logp("Failed to create surface: %s\n", SDL_GetError());
+        LOG("Failed to create surface: %s\n", SDL_GetError());
         goto error_init;
     }
 
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
             SDL_ClearSurface(surface, 0, 0, 0, 0);
 
             if(!SDL_LockSurface(surface)) {
-                logp("Failed to lock surface: %s\n", SDL_GetError());
+                LOG("Failed to lock surface: %s\n", SDL_GetError());
             }
 
             engine_render((char *)(surface->pixels), surface->w, surface->h, surface->pitch);
@@ -135,11 +135,11 @@ int main(int argc, char **argv) {
         }
 
         if(!SDL_BlitSurface(surface, NULL, win_surf, NULL)) {
-            logp("Failed to blit surface: %s\n", SDL_GetError());
+            LOG("Failed to blit surface: %s\n", SDL_GetError());
         }
 
         if(!SDL_UpdateWindowSurface(window)) {
-            logp("Failed to update window surface: %s\n", SDL_GetError());
+            LOG("Failed to update window surface: %s\n", SDL_GetError());
         }
 
         SDL_Delay(20);
@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
         }
 
         if(total_move.x != 0.0 || total_move.y != 0.0) {
-            engine_move(total_move.x, total_move.y);
+            engine_move(v.pos.x + total_move.x, v.pos.y + total_move.y);
             fprintf(stderr, "\r%f %f %f", v.pos.x, v.pos.y, v.angle);
             redraw = 1;
         }

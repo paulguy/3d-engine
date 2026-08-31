@@ -141,11 +141,11 @@ void print_sectors() {
     int i, j;
 
     for(i = 0; i < numsectors; i++) {
-        logp("Sector %d\n", i);
+        LOG("Sector %d\n", i);
         for(j = 0; j < (*s)[i].numlines; j++) {
-            logp("%f, %f  ", (*(*s)[i].line)[j].point->x, (*(*s)[i].line)[j].point->y);
+            LOG("%f, %f  ", (*(*s)[i].line)[j].point->x, (*(*s)[i].line)[j].point->y);
         }
-        logp("\n");
+        LOG("\n");
     }
 }
 
@@ -165,8 +165,9 @@ void engine_load() {
     for(i = 0; i < numlines; i++) {
         (*l)[i].point = &(*p)[(intptr_t)(*l)[i].point];
     }
-
+/*
     print_sectors();
+    */
 
     /* temporarily place view at center of first sector */
     v.start = &(*s)[0];
@@ -182,22 +183,10 @@ void engine_load() {
     v.fov = FOV;
 }
 
-void fill_slope(float *points, int num, float fov) {
-    float edge = sin(fov / 2.0);
-    int i;
-
-    for(i = 0; i < num / 2; i++) {
-        points[i] = edge / num / 2 * i;
-        points[num - 1 - i] = points[i];
-    }
-}
-
 Axis find_slope(float angle, float *slope) {
     /* find rise and run of a ray firing from the view such that each unit of slope 
      * given any offset plots a line perpendicular to the view center angle */
 
-
-    logp("%f %f\n", angle, *slope);
     /* avoid division by 0 ... things might still get weird at angles extremely close to the axis
      * so i might still need to return to the -45,+45 degree off axis ranges or return the 
      * slope as a vector and do the transformation in line_hit */
@@ -263,7 +252,6 @@ int line_hit(Point *p1, Point *p2,
             /* if intercept is outside of the line's bounds, it's not eligible */
             if(!((x >= p1->x && x <= p2->x) ||
                  (x >= p2->x && x <= p1->x))) {
-                logp("X No %f %f\n", lslope, x);
                 return(0);
             }
         }
@@ -280,12 +268,10 @@ int line_hit(Point *p1, Point *p2,
             /* X intercept is between line points and in front of view as sector lines are clockwise */
 
             /* pythagorean theorem solving for hypotenuse */
-            logp("X %f %f %f\n", lslope, x, y);
             hit->x = x;
             hit->y = y;
             return(1);
         }
-        logp("X No %f %f %f\n", lslope, x, y);
     } else {
         /* view ray about Y axis */
 
@@ -304,7 +290,6 @@ int line_hit(Point *p1, Point *p2,
             /* if intercept is outside of the line's bounds, it's not eligible */
             if(!((y >= p1->y && y <= p2->y) ||
                  (y >= p2->y && y <= p1->y))) {
-                logp("Y No %f %f\n", lslope, y);
                 return(0);
             }
         }
@@ -321,12 +306,10 @@ int line_hit(Point *p1, Point *p2,
             /* X intercept is between line points and in front of view as sector lines are clockwise */
 
             /* pythagorean theorem solving for hypotenuse */
-            logp("Y %f %f %f\n", lslope, x, y);
             hit->x = x;
             hit->y = y;
             return(1);
         }
-        logp("Y No %f %f %f\n", lslope, x, y);
     }
 
     return(0);
@@ -343,7 +326,6 @@ Line *scan_sector(Sector *s,
 
     point = (*s->line)[0].point;
     for(i = 0; i < s->numlines; i++) {
-        logp("%d ", i);
         line = &(*s->line)[i];
 
         /* current line spans from the current point to the next line point */
@@ -351,13 +333,11 @@ Line *scan_sector(Sector *s,
 
         /* don't check for lines that would look back towards the previous sector */
         if(last_s != NULL && line->sector == last_s) {
-            logp("Looks back in to previous sector.\n");
             /* make sure the point used in the next iteration is updated */
             point = nextpoint;
             continue;
         }
 
-        logp("%f %f %f %f ", point->x, point->y, nextpoint->x, nextpoint->y);
         if(line_hit(point, nextpoint,
                     pos, axis, slope,
                     hit)) {
@@ -378,11 +358,7 @@ float get_distance(Axis axis, Point *pos, Point *hit) {
     return(sqrtf(fabs(powf(hit->y - pos->y, 2.0)) + fabs(powf(hit->x - pos->x, 2.0))));
 }
 
-void engine_render(char *pixels, int w, int h, int pitch) {
-    /* these might end up needing to be heap-allocated */
-    float w_slope[w];
-    float h_slope[h];
-
+void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     int i, j;
     Sector *s, *last_s;
     int lastaxis = 0;
@@ -399,12 +375,6 @@ void engine_render(char *pixels, int w, int h, int pitch) {
 
     float edge = v.angle - (v.fov / 2.0);
     float step = v.fov / (float)w;
-    logp("%f %f %f %f %d %f %f\n", v.pos.x, v.pos.y, v.angle, v.fov, w, edge, step);
-
-/*
-    fill_delta(&w_delta, w, v.fov);
-    fill_delta(&h_delta, h, v.fov);
-*/
 
     /* for each column */
     for(i = 0; i < w; i++) {
@@ -431,29 +401,11 @@ void engine_render(char *pixels, int w, int h, int pitch) {
 
             /* shouldn't happen, but in case the ray misses for some reason */
             if(line == NULL) {
-                logp("wall missed!\n");
                 break;
-            }
-
-            switch(axis) {
-                case AXIS_NX:
-                    logp("-X ");
-                    break;
-                case AXIS_PX:
-                    logp("+X ");
-                    break;
-                case AXIS_NY:
-                    logp("-Y ");
-                    break;
-                case AXIS_PY:
-                    logp("+Y ");
-                    break;
             }
 
             /* get the distance between the view and hit coordinates */
             distance = get_distance(axis, &pos, &hit);
-
-            logp("%f %f %d %f\n", hit.x, hit.y, i, distance);
 
             /* fisheye compensation, this kinda doesn't work 100% but whatever? */
             distance *= cos(-(v.fov / 2.0) + (step * (float)i));
@@ -482,7 +434,6 @@ void engine_render(char *pixels, int w, int h, int pitch) {
             }
             last_s = s;
             s = line->sector;
-            logp("Found a sector\n");
 
             /* visualize next sector floor edge */
             y = atan2f(total_distance, s->floor_h - v.height) / (v.fov / 2.0) * ((float)h / 2.0) - ((float)h / 2.0);
@@ -504,7 +455,6 @@ void engine_render(char *pixels, int w, int h, int pitch) {
 
             /* column fully drawn */
             if(top >= bottom) {
-                logp("Column filled up %d %d\n", top, bottom);
                 break;
             }
 
@@ -532,43 +482,26 @@ void engine_move(float x, float y) {
     Line *line;
     Sector *s;
     Sector *last_s;
+    float diffx, diffy;
+    diffx = x - v.pos.x;
+    diffy = y - v.pos.y;
 
     /* similar to line_hit but rather than a view ray off in to "infinity", a line segment from current position and the difference position */
-    if(fabs(x) > fabs(y)) {
-        if(x > 0.0) {
+    if(fabs(diffx) > fabs(diffy)) {
+        if(diffx > 0.0) {
             axis = AXIS_PX;
         } else {
             axis = AXIS_NX;
         }
-        slope = y / x;
+        slope = diffy / diffx;
     } else {
-        if(y > 0.0) {
+        if(diffy > 0.0) {
             axis = AXIS_PY;
         } else {
             axis = AXIS_NY;
         }
-        slope = x / y;
+        slope = diffx / diffy;
     }
-
-    /* the difference isn't needed anymore */
-    x += v.pos.x;
-    y += v.pos.y;
-
-    switch(axis) {
-        case AXIS_NX:
-            logp("-X ");
-            break;
-        case AXIS_PX:
-            logp("+X ");
-            break;
-        case AXIS_NY:
-            logp("-Y ");
-            break;
-        case AXIS_PY:
-            logp("+Y ");
-            break;
-    }
-    logp("%f %f %f %f %f\n", v.pos.x, v.pos.y, x, y, slope);
 
     pos.x = v.pos.x;
     pos.y = v.pos.y;
@@ -579,11 +512,9 @@ void engine_move(float x, float y) {
                            &pos, axis, slope,
                            last_s,
                            &hit);
-        logp("\n%f %f\n", hit.x, hit.y);
 
         /* shouldn't happen, but in case the ray misses for some reason */
         if(line == NULL) {
-            logp("wall missed!\n");
             break;
         }
 
@@ -598,16 +529,13 @@ void engine_move(float x, float y) {
         } else if(axis == AXIS_NY && hit.y < y) {
             break;
         }
-        logp("left sector.\n");
 
         /* if wall collided, don't continue to move
          * this isn't intended to be very interactive, so for now, don't bother with real collision
          * detection, just make sure the view can't leave where there're no sectors */
         if(line->sector == NULL) {
-            logp("Hit wall.\n");
             return;
         }
-        logp("Entered new sector.\n");
 
         pos.x = hit.x;
         pos.y = hit.y;
@@ -621,3 +549,92 @@ void engine_move(float x, float y) {
     v.start = s;
     v.height = s->floor_h + VIEW_HEIGHT;
 }
+
+/* only compile these if detected that it's using the broken pebble SDK math */
+#ifdef BROKEN_MATH
+float sin_lookup_wrapper(float angle) {
+    return (float)sin_lookup((int)(angle / (M_PI * 2.0) * 65536.0)) / 65536.0;
+}
+
+float cos_lookup_wrapper(float angle) {
+    return (float)cos_lookup((int)(angle / (M_PI * 2.0) * 65536.0)) / 65536.0;
+}
+
+/* from https://github.com/Jejis06/fsqrt/blob/main/main.cpp
+ * based on Quake 3's fast sqrt */
+
+float fast_sqrt(float number) {
+    if (number <= 0) return 0;
+    
+    union {
+        float f;
+        uint32_t i;
+    } conv = {.f = number};
+    
+    conv.i = 0x1fbb4000 + (conv.i >> 1);  // Magic number derived for sqrt approximation
+    
+    // Newton-Raphson iteration for refinement
+    conv.f = 0.5f * (conv.f + number / conv.f);
+    conv.f = 0.5f * (conv.f + number / conv.f);  // Second iteration for better accuracy
+    
+    return conv.f;
+}
+
+/* from https://github.com/ducha-aiki/fast_atan2
+ * with New BSD license */
+
+#define M_PI_4_P_0273	1.05839816339744830962 //M_PI/4 + 0.273
+float atan2approx(float y,float x) {
+  float absx, absy;
+  absy = fabs(y);
+  absx = fabs(x);
+  short octant = ((x<0) << 2) + ((y<0) << 1 ) + (absx <= absy);
+  switch (octant) {
+    case 0: {
+        if (x == 0 && y == 0)
+          return 0;
+        float val = absy/absx;
+        return (M_PI_4_P_0273 - 0.273*val)*val; //1st octant
+        break;
+      }
+    case 1:{
+        if (x == 0 && y == 0)
+          return 0.0;
+        float val = absx/absy;
+        return M_PI_2 - (M_PI_4_P_0273 - 0.273*val)*val; //2nd octant
+        break;
+      }
+    case 2: {
+        float val =absy/absx;
+        return -(M_PI_4_P_0273 - 0.273*val)*val; //8th octant
+        break;
+      }
+    case 3: {
+        float val =absx/absy;
+        return -M_PI_2 + (M_PI_4_P_0273 - 0.273*val)*val;//7th octant
+        break;
+      }
+    case 4: {
+        float val =absy/absx;
+        return  M_PI - (M_PI_4_P_0273 - 0.273*val)*val;  //4th octant
+      }
+    case 5: {
+        float val =absx/absy;
+        return  M_PI_2 + (M_PI_4_P_0273 - 0.273*val)*val;//3rd octant
+        break;
+      }
+    case 6: {
+        float val =absy/absx;
+        return -M_PI + (M_PI_4_P_0273 - 0.273*val)*val; //5th octant
+        break;
+      }
+    case 7: {
+        float val =absx/absy;
+        return -M_PI_2 - (M_PI_4_P_0273 - 0.273*val)*val; //6th octant
+        break;
+      }
+    default:
+      return 0.0;
+    }
+}
+#endif
