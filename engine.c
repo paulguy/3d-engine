@@ -359,7 +359,6 @@ float get_distance(Axis axis, Point *pos, Point *hit) {
 }
 
 void engine_render(unsigned char *pixels, int w, int h, int pitch) {
-    int i, j;
     Sector *s, *last_s;
     int lastaxis = 0;
     float angle;
@@ -369,16 +368,26 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     Point hit;
     float distance;
     float total_distance;
-    int y;
+    int x, y;
+    float z;
+    float wx, wy, wz;
     int top, bottom;
     Point pos;
+    float compensation;
+    float ceilingdiff;
+    float floordiff;
+    float next_y;
 
-    float edge = v.angle - (v.fov / 2.0);
+    float h_2 = (float)h / 2.0;
+    float fov_2 = v.fov / 2.0;
+    float edge = v.angle - fov_2;
     float step = v.fov / (float)w;
+    float y_to_angle = fov_2 / h_2;
+    float angle_to_y = h_2 / fov_2;
 
     /* for each column */
-    for(i = 0; i < w; i++) {
-        angle = fmodf(edge + (step * (float)i), M_PI * 2.0);
+    for(x = 0; x < w; x++) {
+        angle = fmodf(edge + (step * (float)x), M_PI * 2.0);
         if(angle < 0.0) {
             angle += M_PI * 2.0;
         }
@@ -387,8 +396,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
 
         s = v.start;
         last_s = NULL;
-        top = -1;
-        bottom = h;
+        top = 0;
+        bottom = h - 1;
         pos.x = v.pos.x;
         pos.y = v.pos.y;
         total_distance = 0.0;
@@ -408,50 +417,84 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             distance = get_distance(axis, &pos, &hit);
 
             /* fisheye compensation, this kinda doesn't work 100% but whatever? */
-            distance *= cos(-(v.fov / 2.0) + (step * (float)i));
+            compensation = cos(-fov_2 + (step * (float)x));
+            distance *= compensation;
 
             total_distance += distance;
-            /* visualize floor edge */
-            y = atan2f(total_distance, s->floor_h - v.height) / (v.fov / 2.0) * ((float)h / 2.0) - ((float)h / 2.0);
-            if(y < bottom) {
-                if(y >= 0 && y < h) {
-                    pixels[y * pitch + i] = 0xFF;
-                }
-                bottom = y;
-            }
+            /* iterate y (angle transformed with FOV to get an angle from screen Y) with height
+             * from bottom solving for distance until total distance is reached.
+             * Texture X and Y lookup from offset from view given ray angle */
 
-            /* visualize ceiling edge */
-            y = atan2f(total_distance, s->ceiling_h - v.height) / (v.fov / 2.0) * ((float)h / 2.0) - ((float)h / 2.0);
-            if(y > top) {
-                if(y >= 0 && y < h) {
-                    pixels[y * pitch + i] = 0xFF;
+            /* draw ceiling */
+            ceilingdiff = s->ceiling_h - v.height;
+            for(y = top; y < h; y++) {
+                z = ceilingdiff / tanf((h_2 - y) * y_to_angle);
+                if(z >= total_distance) {
+                    break;
                 }
-                top = y;
+                z /= compensation;
+                wx = v.pos.x + (sin(angle) * z);
+                wy = v.pos.y + (cos(angle) * z);
+                pixels[y * pitch + x] = 0xC0 | (((int)wx ^ (int)wy) & 0x3F);
             }
+            top = y;
+
+            /* draw floor */
+            floordiff = s->floor_h - v.height;
+            for(y = bottom; y >= 0; y--) {
+                z = -floordiff / tanf((y - h_2) * y_to_angle);
+                if(z >= total_distance) {
+                    break;
+                }
+                z /= compensation;
+                wx = v.pos.x + (sin(angle) * z);
+                wy = v.pos.y + (cos(angle) * z);
+                pixels[y * pitch + x] = 0xC0 | (((int)wx ^ (int)wy) & 0x3F);
+            }
+            bottom = y;
 
             if(line->sector == NULL) {
+                /* solid wall, no sector on the other side */
+
+                /* draw wall */
+                wx = v.pos.x + (sin(angle) * total_distance);
+                wy = v.pos.y + (cos(angle) * total_distance);
+                for(y = top;
+                    y <= bottom && y < h;
+                    y++) {
+                    wz = ((y - h_2) * y_to_angle) * total_distance;
+                    pixels[y * pitch + x] = 0xC0 | (((int)wx ^ (int)wy ^ (int)wz) & 0x3F);
+                }
                 break;
             }
             last_s = s;
             s = line->sector;
 
-            /* visualize next sector floor edge */
-            y = atan2f(total_distance, s->floor_h - v.height) / (v.fov / 2.0) * ((float)h / 2.0) - ((float)h / 2.0);
-            if(y < bottom) {
-                if(y >= 0 && y < h) {
-                    pixels[y * pitch + i] = 0xFF;
-                }
-                bottom = y;
+            /* draw top wall */
+            wx = v.pos.x + (sin(angle) * total_distance);
+            wy = v.pos.y + (cos(angle) * total_distance);
+            ceilingdiff = s->ceiling_h - v.height;
+            next_y = atan2f(total_distance, ceilingdiff) * angle_to_y - h_2;
+            for(y = top;
+                y <= next_y && y < h;
+                y++) {
+                wz = ((y - h_2) * y_to_angle) * total_distance;
+                pixels[y * pitch + x] = 0xC0 | (((int)wx ^ (int)wy ^ (int)wz) & 0x3F);
             }
-
-            /* visualize next sector ceiling edge */
-            y = atan2f(total_distance, s->ceiling_h - v.height) / (v.fov / 2.0) * ((float)h / 2.0) - ((float)h / 2.0);
-            if(y > top) {
-                if(y >= 0 && y < h) {
-                    pixels[y * pitch + i] = 0xFF;
-                }
-                top = y;
+            top = y;
+ 
+            /* draw bottom wall */
+            wx = v.pos.x + (sin(angle) * total_distance);
+            wy = v.pos.y + (cos(angle) * total_distance);
+            floordiff = s->floor_h - v.height;
+            next_y = atan2f(total_distance, floordiff) * angle_to_y - h_2;
+            for(y = bottom;
+                y >= next_y && y >= 0;
+                y--) {
+                wz = ((y - h_2) * y_to_angle) * total_distance;
+                pixels[y * pitch + x] = 0xC0 | (((int)wx ^ (int)wy ^ (int)wz) & 0x3F);
             }
+            bottom = y;
 
             /* column fully drawn */
             if(top >= bottom) {
@@ -461,15 +504,6 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             pos.x = hit.x;
             pos.y = hit.y;
         }
-
-        /*
-        if(axis != lastaxis) {
-            for(j = 0; j < 40; j++) {
-                pixels[j * pitch + i] = 0xFF;
-                lastaxis = axis;
-            }
-        }
-        */
     }
 }
 
@@ -578,6 +612,12 @@ float fast_sqrt(float number) {
     conv.f = 0.5f * (conv.f + number / conv.f);  // Second iteration for better accuracy
     
     return conv.f;
+}
+
+/* from wikipedia */
+float tanf(float angle) {
+    float sinangle = sin_lookup_wrapper(angle);
+    return sinangle / fast_sqrt(1.0 - (sinangle * sinangle));
 }
 
 /* from https://github.com/ducha-aiki/fast_atan2
