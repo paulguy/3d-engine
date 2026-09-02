@@ -44,6 +44,60 @@
 #include "engine.h"
 #include "log.h"
 
+SDL_Surface *load_png_checked(int number) {
+    char name[16];
+    snprintf(name, sizeof(name), "tex%d.png", number);
+
+    SDL_Surface *png = SDL_LoadPNG(name);
+    if(png == NULL) {
+        LOG("Couldn't open file: %s, %s\n", name, SDL_GetError());
+        return(NULL);
+    }
+
+    if(png->format != SDL_PIXELFORMAT_INDEX8) {
+        LOG("Image must be 8BPP paletted!");
+        SDL_DestroySurface(png);
+        return(NULL);
+    }
+
+    if(png->w != png->h) {
+        LOG("Image must be square!");
+        SDL_DestroySurface(png);
+        return(NULL);
+    }
+
+    return(png);
+}
+
+int get_graphic_dim(int number) {
+    SDL_Surface *png = load_png_checked(number);
+    if(png == NULL) {
+        return(-1);
+    }
+
+    int width = png->w;
+    SDL_DestroySurface(png);
+
+    return(width);
+}
+
+int load_graphic(int number, unsigned char *data) {
+    int y;
+
+    SDL_Surface *png = load_png_checked(number);
+    if(png == NULL) {
+        return(-1);
+    }
+
+    for(y = 0; y < png->h; y++) {
+        memcpy(&(data[y * png->h]), &(((unsigned char *)png->pixels)[y * png->pitch]), png->w);
+    }
+
+    SDL_DestroySurface(png);
+
+    return(0);
+}
+
 int main(int argc, char **argv) {
     SDL_Window *window;
     SDL_Surface *win_surf;
@@ -115,6 +169,9 @@ int main(int argc, char **argv) {
         }
     }
 
+    /* setup wrapper function pointers */
+    get_graphic_dim_p = get_graphic_dim;
+    load_graphic_p = load_graphic;
     engine_load();
 
     log_quiet = 1;
@@ -127,7 +184,7 @@ int main(int argc, char **argv) {
                 LOG("Failed to lock surface: %s\n", SDL_GetError());
             }
 
-            engine_render((char *)(surface->pixels), surface->w, surface->h, surface->pitch);
+            engine_render((unsigned char *)(surface->pixels), surface->w, surface->h, surface->pitch);
 
             SDL_UnlockSurface(surface);
 
@@ -210,7 +267,6 @@ int main(int argc, char **argv) {
             if(v.angle < 0.0) {
                 v.angle += M_PI * 2.0;
             }
-            fprintf(stderr, "\r%f %f %f", v.pos.x, v.pos.y, v.angle);
             redraw = 1;
         }
 

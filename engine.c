@@ -445,13 +445,12 @@ Line *scan_sector(Sector *s,
     return NULL;
 }
 
-float get_distance(Axis axis, Point *pos, Point *hit) {
+float get_distance(Point *pos, Point *hit) {
     return(sqrtf(fabs(powf(hit->y - pos->y, 2.0)) + fabs(powf(hit->x - pos->x, 2.0))));
 }
 
 void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     Sector *s, *last_s;
-    int lastaxis = 0;
     float angle;
     int axis;
     float slope;
@@ -470,12 +469,31 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     float ceilingdiff;
     float floordiff;
     float next_y;
+    int floor_tex = -1;
+    int floor_dim = 0;
+    int floor_mask = 0;
+    unsigned char *floor_data = NULL;
+    int ceiling_tex = -1;
+    int ceiling_dim = 0;
+    int ceiling_mask = 0;
+    unsigned char *ceiling_data = NULL;
+    int top_wall_tex = -1;
+    int top_wall_dim = 0;
+    int top_wall_mask = 0;
+    unsigned char *top_wall_data = NULL;
+    int bottom_wall_tex = -1;
+    int bottom_wall_dim = 0;
+    int bottom_wall_mask = 0;
+    unsigned char *bottom_wall_data = NULL;
+    unsigned char color;
 
     float h_2 = (float)h / 2.0;
     float fov_2 = v.fov / 2.0;
     float step = v.fov / (float)w;
     float y_to_angle = fov_2 / h_2;
     float angle_to_y = h_2 / fov_2;
+
+    age_slots();
 
     /* for each column */
     for(x = 0; x < w; x++) {
@@ -487,6 +505,29 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
         axis = find_slope(angle, &slope);
 
         s = v.start;
+        if(s->texture[0] != ceiling_tex) {
+            ceiling_tex = s->texture[0];
+            ceiling_dim = load_tex(ceiling_tex, &ceiling_data);
+            if(ceiling_dim == 64) {
+                ceiling_mask = 0x3F;
+                ceiling_dim = 6;
+            } else if(ceiling_dim == 32) {
+                ceiling_mask = 0x1F;
+                ceiling_dim = 5;
+            }
+        }
+        if(s->texture[1] != floor_tex) {
+            floor_tex = s->texture[1];
+            floor_dim = load_tex(floor_tex, &floor_data);
+            if(floor_dim == 64) {
+                floor_mask = 0x3F;
+                floor_dim = 6;
+            } else if(floor_dim == 32) {
+                floor_mask = 0x1F;
+                floor_dim = 5;
+            }
+        }
+
         last_s = NULL;
         top = 0;
         bottom = h - 1;
@@ -506,7 +547,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             }
 
             /* get the distance between the view and hit coordinates */
-            distance = get_distance(axis, &pos, &hit);
+            distance = get_distance(&pos, &hit);
             accumulated_distance += distance;
 
             /* fisheye compensation, this kinda doesn't work 100% but whatever? */
@@ -534,7 +575,12 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     ty = (wx * s->texture_transform[0].yx) +
                          (wy * s->texture_transform[0].yy) +
                          s->texture_bias[0].y;
-                    pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
+                    if(ceiling_dim == 0) {
+                        pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
+                    } else {
+                        color = ceiling_data[(ty & ceiling_mask) << ceiling_dim | (tx & ceiling_mask)];
+                        pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03);
+                    }
                 }
                 top = y;
             }
@@ -556,7 +602,13 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     ty = (wx * s->texture_transform[1].yx) +
                          (wy * s->texture_transform[1].yy) +
                          s->texture_bias[1].y;
-                    pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
+                    if(floor_dim == 0) {
+                        pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
+                    } else {
+                        color = floor_data[(ty & floor_mask) << floor_dim | (tx & floor_mask)];
+                        pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03);
+                    }
+ 
                 }
                 bottom = y;
             }
@@ -586,6 +638,30 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             last_s = s;
             s = line->sector;
 
+            if(s->texture[0] != ceiling_tex) {
+                ceiling_tex = s->texture[0];
+                ceiling_dim = load_tex(ceiling_tex, &ceiling_data);
+                if(ceiling_dim == 64) {
+                floor_dim = 0x3F;
+                    ceiling_mask = 0x3F;
+                    ceiling_dim = 6;
+                } else if(ceiling_dim == 32) {
+                    ceiling_mask = 0x1F;
+                    ceiling_dim = 5;
+                }
+            }
+            if(s->texture[1] != floor_tex) {
+                floor_tex = s->texture[1];
+                floor_dim = load_tex(floor_tex, &floor_data);
+                if(floor_dim == 64) {
+                    floor_mask = 0x3F;
+                    floor_dim = 6;
+                } else if(floor_dim == 32) {
+                    floor_mask = 0x1F;
+                    floor_dim = 5;
+                }
+            }
+
             /* draw top wall */
             wx = v.pos.x + (sin(angle) * total_distance);
             wy = v.pos.y + (cos(angle) * total_distance);
@@ -605,6 +681,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                      line->texture_bias[0].y;
                 pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
             }
+            top = y;
 
             /* draw bottom wall */
             wx = v.pos.x + (sin(angle) * total_distance);
@@ -643,7 +720,6 @@ void engine_move(float x, float y) {
     float slope;
     Point pos;
     Point hit;
-    float distance;
     Line *line;
     Sector *s;
     Sector *last_s;

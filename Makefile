@@ -1,4 +1,4 @@
-OBJS   = log.o engine.o main.o
+OBJS   = log.o cache.o engine.o main.o
 TARGET = engine
 CFLAGS := `pkg-config sdl3 --cflags` -D_GNU_SOURCE -Wall -Wextra -fpermissive -ggdb -Og $(CFLAGS)
 LDFLAGS = `pkg-config sdl3 --libs` -lm
