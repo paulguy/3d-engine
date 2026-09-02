@@ -111,23 +111,117 @@ Point pdata[] = {
     {50, 300}
 };
 Line ldata[] = {
-    {0, 1, {0, 0}},
-    {1, 99999, {0, 0}},
-    {2, 99999, {0, 0}},
-    {3, 99999, {0, 0}},
-    {4, 99999, {0, 0}},
-    {5, 99999, {0, 0}},
-    {6, 99999, {0, 0}},
-    {7, 99999, {0, 0}},
+    {0, 1,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{1.0, 0.0, 0.0,
+       0.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}},
+    {1, 99999,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{0.7, -0.7, 0.0,
+       0.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}},
+    {2, 99999,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{0.0, 0.25, 0.0,
+       0.0, 0.0, 0.25},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}},
+    {3, 99999,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{0.7, 0.7, 0.0,
+       0.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}},
+    {4, 99999,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{1.0, 0.0, 0.0,
+       0.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}},
+    {5, 99999,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{0.7, -0.7, 0.0,
+       0.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}},
+    {6, 99999,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{0.0, 1.0, 0.0,
+       0.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}},
+    {7, 99999,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{0.7, 0.7, 0.0,
+       0.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}},
 
-    {8, 99999, {0, 0}},
-    {9, 99999, {0, 0}},
-    {1, 0, {0, 0}},
-    {0, 99999, {0, 0}}
+    {8, 99999,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{1.0, 0.0, 0.0,
+       0.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}},
+    {9, 99999,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{0.0, 1.0, 0.0,
+       0.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}},
+    {1, 0,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0},
+      {1.0, 0.0, 0.0,
+       0.0, 0.0, 1.0}}},
+    {0, 99999,
+     {0, 0},
+     {{0.0, 0.0},
+      {0.0, 0.0}},
+     {{0.0, 1.0, 0.0,
+       0.0, 0.0, 1.0},
+      {0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0}}}
 };
 Sector sdata[] = {
-    {&(ldata[0]), 8, -50, 50, {0, 0}},
-    {&(ldata[8]), 4, -60, 40, {0, 0}}
+    {&(ldata[0]), 8, -50, 50, {0, 0},
+        {{0.0, 0.0}, {0.0, 0.0}},
+        {{1.0, 0.0,
+          0.0, 1.0},
+         {1.0, 0.0,
+          0.0, 1.0}}},
+    {&(ldata[8]), 4, -60, 40, {0, 0},
+        {{0.0, 0.0}, {0.0, 0.0}},
+        {{1.0, 0.0,
+          0.0, 1.0},
+         {1.0, 0.0,
+          0.0, 1.0}}}
 };
 
 View v;
@@ -181,6 +275,7 @@ void engine_load() {
     v.pos.y /= (*s)[0].numlines;
     v.angle = 0.0;
     v.fov = FOV;
+    v.height = v.start->floor_h + VIEW_HEIGHT;
 }
 
 Axis find_slope(float angle, float *slope) {
@@ -351,10 +446,6 @@ Line *scan_sector(Sector *s,
 }
 
 float get_distance(Axis axis, Point *pos, Point *hit) {
-    if(axis == AXIS_NX || axis == AXIS_PX) {
-        return(sqrtf(fabs(powf(hit->x - pos->x, 2.0)) + fabs(powf(hit->y - pos->y, 2.0))));
-    }
-
     return(sqrtf(fabs(powf(hit->y - pos->y, 2.0)) + fabs(powf(hit->x - pos->x, 2.0))));
 }
 
@@ -367,10 +458,12 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     Line *line;
     Point hit;
     float distance;
+    float accumulated_distance;
     float total_distance;
     int x, y;
     float z;
     float wx, wy, wz;
+    int tx, ty;
     int top, bottom;
     Point pos;
     float compensation;
@@ -380,14 +473,13 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
 
     float h_2 = (float)h / 2.0;
     float fov_2 = v.fov / 2.0;
-    float edge = v.angle - fov_2;
     float step = v.fov / (float)w;
     float y_to_angle = fov_2 / h_2;
     float angle_to_y = h_2 / fov_2;
 
     /* for each column */
     for(x = 0; x < w; x++) {
-        angle = fmodf(edge + (step * (float)x), M_PI * 2.0);
+        angle = fmodf(v.angle + (step * (x - h_2)), M_PI * 2.0);
         if(angle < 0.0) {
             angle += M_PI * 2.0;
         }
@@ -400,7 +492,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
         bottom = h - 1;
         pos.x = v.pos.x;
         pos.y = v.pos.y;
-        total_distance = 0.0;
+        accumulated_distance = 0.0;
         while (1) {
             /* TODO: scan in to portal walls until solid wall or distance reached */
             line = scan_sector(s,
@@ -415,43 +507,59 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
 
             /* get the distance between the view and hit coordinates */
             distance = get_distance(axis, &pos, &hit);
+            accumulated_distance += distance;
 
             /* fisheye compensation, this kinda doesn't work 100% but whatever? */
             compensation = cos(-fov_2 + (step * (float)x));
-            distance *= compensation;
 
-            total_distance += distance;
+            total_distance = accumulated_distance * compensation;
             /* iterate y (angle transformed with FOV to get an angle from screen Y) with height
              * from bottom solving for distance until total distance is reached.
              * Texture X and Y lookup from offset from view given ray angle */
 
             /* draw ceiling */
             ceilingdiff = s->ceiling_h - v.height;
-            for(y = top; y < h; y++) {
-                z = ceilingdiff / tanf((h_2 - y) * y_to_angle);
-                if(z >= total_distance) {
-                    break;
+            if(ceilingdiff > 0.0) {
+                for(y = top; y < h; y++) {
+                    z = ceilingdiff / tanf((h_2 - y) * y_to_angle);
+                    if(z >= total_distance) {
+                        break;
+                    }
+                    z /= compensation;
+                    wx = v.pos.x + (sin(angle) * z);
+                    wy = v.pos.y + (cos(angle) * z);
+                    tx = (wx * s->texture_transform[0].xx) +
+                         (wy * s->texture_transform[0].xy) +
+                         s->texture_bias[0].x;
+                    ty = (wx * s->texture_transform[0].yx) +
+                         (wy * s->texture_transform[0].yy) +
+                         s->texture_bias[0].y;
+                    pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
                 }
-                z /= compensation;
-                wx = v.pos.x + (sin(angle) * z);
-                wy = v.pos.y + (cos(angle) * z);
-                pixels[y * pitch + x] = 0xC0 | (((int)wx ^ (int)wy) & 0x3F);
+                top = y;
             }
-            top = y;
 
             /* draw floor */
             floordiff = s->floor_h - v.height;
-            for(y = bottom; y >= 0; y--) {
-                z = -floordiff / tanf((y - h_2) * y_to_angle);
-                if(z >= total_distance) {
-                    break;
+            if(floordiff < 0.0) {
+                for(y = bottom; y >= 0; y--) {
+                    z = -floordiff / tanf((y - h_2) * y_to_angle);
+                    if(z >= total_distance) {
+                        break;
+                    }
+                    z /= compensation;
+                    wx = v.pos.x + (sin(angle) * z);
+                    wy = v.pos.y + (cos(angle) * z);
+                    tx = (wx * s->texture_transform[1].xx) +
+                         (wy * s->texture_transform[1].xy) +
+                         s->texture_bias[1].x;
+                    ty = (wx * s->texture_transform[1].yx) +
+                         (wy * s->texture_transform[1].yy) +
+                         s->texture_bias[1].y;
+                    pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
                 }
-                z /= compensation;
-                wx = v.pos.x + (sin(angle) * z);
-                wy = v.pos.y + (cos(angle) * z);
-                pixels[y * pitch + x] = 0xC0 | (((int)wx ^ (int)wy) & 0x3F);
+                bottom = y;
             }
-            bottom = y;
 
             if(line->sector == NULL) {
                 /* solid wall, no sector on the other side */
@@ -462,8 +570,16 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 for(y = top;
                     y <= bottom && y < h;
                     y++) {
-                    wz = ((y - h_2) * y_to_angle) * total_distance;
-                    pixels[y * pitch + x] = 0xC0 | (((int)wx ^ (int)wy ^ (int)wz) & 0x3F);
+                    wz = ((y - h_2) * y_to_angle) * total_distance - v.height;
+                    tx = (wx * line->texture_transform[0].xx) +
+                         (wy * line->texture_transform[0].xy) +
+                         (wz * line->texture_transform[0].xz) +
+                         line->texture_bias[0].x;
+                    ty = (wx * line->texture_transform[0].yx) +
+                         (wy * line->texture_transform[0].yy) +
+                         (wz * line->texture_transform[0].yz) +
+                         line->texture_bias[0].y;
+                    pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
                 }
                 break;
             }
@@ -479,10 +595,17 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 y <= next_y && y < h;
                 y++) {
                 wz = ((y - h_2) * y_to_angle) * total_distance;
-                pixels[y * pitch + x] = 0xC0 | (((int)wx ^ (int)wy ^ (int)wz) & 0x3F);
+                tx = (wx * line->texture_transform[0].xx) +
+                     (wy * line->texture_transform[0].xy) +
+                     (wz * line->texture_transform[0].xz) +
+                     line->texture_bias[0].x;
+                ty = (wx * line->texture_transform[0].yx) +
+                     (wy * line->texture_transform[0].yy) +
+                     (wz * line->texture_transform[0].yz) +
+                     line->texture_bias[0].y;
+                pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
             }
-            top = y;
- 
+
             /* draw bottom wall */
             wx = v.pos.x + (sin(angle) * total_distance);
             wy = v.pos.y + (cos(angle) * total_distance);
@@ -492,7 +615,15 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 y >= next_y && y >= 0;
                 y--) {
                 wz = ((y - h_2) * y_to_angle) * total_distance;
-                pixels[y * pitch + x] = 0xC0 | (((int)wx ^ (int)wy ^ (int)wz) & 0x3F);
+                tx = (wx * line->texture_transform[1].xx) +
+                     (wy * line->texture_transform[1].xy) +
+                     (wz * line->texture_transform[1].xz) +
+                     line->texture_bias[1].x;
+                ty = (wx * line->texture_transform[1].yx) +
+                     (wy * line->texture_transform[1].yy) +
+                     (wz * line->texture_transform[1].yz) +
+                     line->texture_bias[1].y;
+                pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
             }
             bottom = y;
 

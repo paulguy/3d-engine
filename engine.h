@@ -15,13 +15,26 @@ typedef struct {
     float x, y;
 } Point;
 
+typedef struct {
+    float xx, xy;
+    float yx, yy;
+} Matrix2x2;
+
+typedef struct {
+    float xx, xy, xz;
+    float yx, yy, yz;
+} Matrix3x2;
+
 typedef struct Sector_s Sector;
 typedef struct Line_s Line;
 
 typedef struct Line_s {
     Point *point;
     Sector *sector;
+
     int texture[2];
+    Point texture_bias[2];
+    Matrix3x2 texture_transform[2];
 } Line;
 
 typedef struct Sector_s {
@@ -30,7 +43,10 @@ typedef struct Sector_s {
 
     float floor_h;
     float ceiling_h;
+
     int texture[2];
+    Point texture_bias[2];
+    Matrix2x2 texture_transform[2];
 } Sector;
 
 typedef struct {
