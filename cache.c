@@ -1,13 +1,6 @@
 #include "engine.h"
 #include "log.h"
-
-#define SMALL_TEX_DIM (32)
-#define SMALL_TEX_SIZE (SMALL_TEX_DIM * 2)
-#define LARGE_TEX_DIM (SMALL_TEX_DIM * 2)
-#define LARGE_TEX_SIZE (LARGE_TEX_DIM * 2)
-
-#define TEXMEM (65536)
-#define TEXSLOTS (TEXMEM / LARGE_TEX_DIM)
+#include "cache.h"
 
 /* dimensions are small and only 256 resources are available anyway so use unsigned chars */
 typedef struct {
@@ -27,7 +20,8 @@ typedef struct {
 get_graphic_dim_t get_graphic_dim_p;
 load_graphic_t load_graphic_p;
 
-unsigned char texmem[TEXMEM];
+/* allocated elsewhere! */
+unsigned char *texmem;
 
 TexSlot texslot[TEXSLOTS] = {0};
 
@@ -180,6 +174,10 @@ int load_tex(int number, unsigned char **data) {
     int i, j;
     int dim;
     int found = 0;
+
+    if(number < 0) {
+        return(0);
+    }
 
     /* search for already loaded textures */
     for(i = 0; i < TEXSLOTS; i++) {

@@ -58,17 +58,9 @@ typedef struct {
     float fov;
 } View;
 
-typedef int (* get_graphic_dim_t)(int number);
-typedef int (* load_graphic_t)(int number, unsigned char *data);
-
-extern get_graphic_dim_t get_graphic_dim_p;
-extern load_graphic_t load_graphic_p;
-
 void engine_load();
 void engine_render(unsigned char *pixels, int w, int h, int pitch);
 void engine_move(float x, float y);
-int load_tex(int number, unsigned char **data);
-void age_slots();
 
 float sin_lookup_wrapper(float angle);
 float cos_lookup_wrapper(float angle);

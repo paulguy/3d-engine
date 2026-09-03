@@ -38,11 +38,85 @@
 #include <pebble.h>
 
 #include "engine.h"
+#include "cache.h"
 
 static Window *s_window;
 static GFont s_font;
 static Layer *s_text_layer;
 static Layer *s_engine_layer;
+
+const unsigned char TEX_IDS[] = {
+    RESOURCE_ID_TEX_0
+};
+#define MAX_TEX_ID (sizeof(TEX_IDS) - 1)
+
+#define SMALL_TEX_RES_SIZE (SMALL_TEX_SIZE / 4 * 3)
+#define LARGE_TEX_RES_SIZE (LARGE_TEX_SIZE / 4 * 3)
+
+int get_graphic_dim(int number) {
+    ResHandle handle;
+    size_t res_size;
+
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d %d", number, MAX_TEX_ID);
+
+    if(number > MAX_TEX_ID) {
+        return(-1);
+    }
+
+    handle = resource_get_handle(TEX_IDS[number]);
+
+    res_size = resource_size(handle);
+
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d %d", SMALL_TEX_RES_SIZE, LARGE_TEX_RES_SIZE);
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d", res_size);
+
+    if(res_size == SMALL_TEX_RES_SIZE) {
+        return(SMALL_TEX_DIM);
+    } else if(res_size == LARGE_TEX_RES_SIZE) {
+        return(LARGE_TEX_DIM);
+    }
+
+    /* return invalid size */
+    return(0);
+}
+
+int load_graphic(int number, unsigned char *data) {
+    unsigned int in, out;
+    ResHandle handle;
+    size_t res_size;
+    size_t tex_size;
+
+    if(number > MAX_TEX_ID) {
+        return(-1);
+    }
+
+    handle = resource_get_handle(TEX_IDS[number]);
+
+    res_size = resource_size(handle);
+
+    if(res_size == SMALL_TEX_RES_SIZE) {
+        tex_size = SMALL_TEX_SIZE;
+    } else { /* LARGE_TEX_RES_SIZE */
+        tex_size = LARGE_TEX_SIZE;
+    }
+
+    /* load in and unpack in place */
+    resource_load(handle, &(data[tex_size - res_size]), res_size);
+    out = 0;
+    for(in = tex_size - res_size; in < tex_size; in += 3) {
+        /* ######.. -> ##.##.## */
+        data[out] = (data[in] & 0xC0) | ((data[in] & 0x30) >> 1) | ((data[in] & 0x0C) >> 2);
+        /* ......## -> ##. ##.## <- ####.... */
+        data[out+1] = ((data[in] & 0x03) << 6) | ((data[in+1] & 0xC0) >> 3) | ((data[in+1] & 0x30) >> 4);
+        /* ....#### -> ##.## .## <- ##...... */
+        data[out+2] = ((data[in+1] & 0x0C) << 4) | ((data[in+1] & 0x03) << 3) | ((data[in+2] & 0xC0) >> 6);
+        /* ..###### -> ##.##.## */
+        data[out+3] = ((data[in+2] & 0x30) << 2) | ((data[in+2] & 0xC0) << 1) | (data[in+2] & 0x03);
+        out += 4;
+    }
+
+    return(0);
+}
 
 static void engine_layer_update(struct Layer *layer, GContext *ctx) {
     GBitmap *fb = graphics_capture_frame_buffer(ctx);
@@ -128,6 +202,15 @@ static void prv_init(void) {
     window_stack_push(s_window, animated);
 
     s_font = fonts_get_system_font(FONT_KEY_LECO_26_BOLD_NUMBERS_AM_PM);
+
+    /* setup wrapper function pointers */
+    get_graphic_dim_p = get_graphic_dim;
+    load_graphic_p = load_graphic;
+    /* allocate texture memory */
+    texmem = malloc(TEXMEM);
+    if(texmem == NULL) {
+        APP_LOG(APP_LOG_LEVEL_DEBUG, "Failed to allocate texture memory, probably going to crash.\n", s_window);
+    }
     engine_load();
 
     tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);

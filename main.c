@@ -43,6 +43,7 @@
 
 #include "engine.h"
 #include "log.h"
+#include "cache.h"
 
 SDL_Surface *load_png_checked(int number) {
     char name[16];
@@ -82,7 +83,8 @@ int get_graphic_dim(int number) {
 }
 
 int load_graphic(int number, unsigned char *data) {
-    int y;
+    int y, x;
+    unsigned char pixel;
 
     SDL_Surface *png = load_png_checked(number);
     if(png == NULL) {
@@ -90,7 +92,11 @@ int load_graphic(int number, unsigned char *data) {
     }
 
     for(y = 0; y < png->h; y++) {
-        memcpy(&(data[y * png->h]), &(((unsigned char *)png->pixels)[y * png->pitch]), png->w);
+        for(x = 0; x < png->w; x++) {
+            pixel = ((unsigned char *)png->pixels)[y * png->pitch + x];
+            /* store pixel in "spread out" format */
+            data[y * png->h + x] = ((pixel & 0x30) << 2) | ((pixel & 0x0C) << 1) | (pixel & 0x03);
+        }
     }
 
     SDL_DestroySurface(png);
@@ -172,6 +178,12 @@ int main(int argc, char **argv) {
     /* setup wrapper function pointers */
     get_graphic_dim_p = get_graphic_dim;
     load_graphic_p = load_graphic;
+    /* allocate texture memory */
+    texmem = malloc(TEXMEM);
+    if(texmem == NULL) {
+        LOG("Failed to allocate texture memory.\n");
+        goto error_init;
+    }
     engine_load();
 
     log_quiet = 1;

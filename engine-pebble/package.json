@@ -1,6 +1,6 @@
 {
   "name": "engine-pebble",
-  "author": "MakeAwesomeHappen",
+  "author": "paulguy",
   "version": "1.0.0",
   "keywords": ["pebble-app"],
   "private": true,
@@ -16,11 +16,14 @@
     "watchapp": {
       "watchface": false
     },
-    "messageKeys": [
-      "dummy"
-    ],
     "resources": {
-      "media": []
+      "media": [
+          {
+            "name": "TEX_0",
+            "file": "tex0.bin",
+            "type": "raw"
+          }
+      ]
     }
   }
 }

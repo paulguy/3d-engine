@@ -82,6 +82,7 @@
 
 #include "engine.h"
 #include "log.h"
+#include "cache.h"
 
 #define FOV (90.0 / 360.0 * (M_PI * 2.0))
 #define VIEW_HEIGHT (50)
