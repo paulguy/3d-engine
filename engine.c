@@ -113,6 +113,7 @@ Point pdata[] = {
 };
 Line ldata[] = {
     {0, 1,
+     {1, 1},
      {0, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
@@ -121,7 +122,8 @@ Line ldata[] = {
       {0.0, 0.0, 0.0,
        0.0, 0.0, 0.0}}},
     {1, 99999,
-     {0, 0},
+     {1, 1},
+     {0x192, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
      {{0.7, -0.7, 0.0,
@@ -129,7 +131,8 @@ Line ldata[] = {
       {0.0, 0.0, 0.0,
        0.0, 0.0, 0.0}}},
     {2, 99999,
-     {0, 0},
+     {1, 1},
+     {0x149, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
      {{0.0, 0.25, 0.0,
@@ -137,6 +140,7 @@ Line ldata[] = {
       {0.0, 0.0, 0.0,
        0.0, 0.0, 0.0}}},
     {3, 99999,
+     {1, 1},
      {0, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
@@ -145,7 +149,8 @@ Line ldata[] = {
       {0.0, 0.0, 0.0,
        0.0, 0.0, 0.0}}},
     {4, 99999,
-     {0, 0},
+     {1, 1},
+     {0x49, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
      {{1.0, 0.0, 0.0,
@@ -153,7 +158,8 @@ Line ldata[] = {
       {0.0, 0.0, 0.0,
        0.0, 0.0, 0.0}}},
     {5, 99999,
-     {0, 0},
+     {1, 1},
+     {0x92, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
      {{0.7, -0.7, 0.0,
@@ -161,7 +167,8 @@ Line ldata[] = {
       {0.0, 0.0, 0.0,
        0.0, 0.0, 0.0}}},
     {6, 99999,
-     {0, 0},
+     {1, 1},
+     {0x108, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
      {{0.0, 1.0, 0.0,
@@ -169,7 +176,8 @@ Line ldata[] = {
       {0.0, 0.0, 0.0,
        0.0, 0.0, 0.0}}},
     {7, 99999,
-     {0, 0},
+     {1, 1},
+     {0x08, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
      {{0.7, 0.7, 0.0,
@@ -178,6 +186,7 @@ Line ldata[] = {
        0.0, 0.0, 0.0}}},
 
     {8, 99999,
+     {1, 1},
      {0, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
@@ -186,6 +195,7 @@ Line ldata[] = {
       {0.0, 0.0, 0.0,
        0.0, 0.0, 0.0}}},
     {9, 99999,
+     {1, 1},
      {0, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
@@ -194,6 +204,7 @@ Line ldata[] = {
       {0.0, 0.0, 0.0,
        0.0, 0.0, 0.0}}},
     {1, 0,
+     {1, 1},
      {0, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
@@ -202,6 +213,7 @@ Line ldata[] = {
       {1.0, 0.0, 0.0,
        0.0, 0.0, 1.0}}},
     {0, 99999,
+     {1, 1},
      {0, 0},
      {{0.0, 0.0},
       {0.0, 0.0}},
@@ -211,13 +223,13 @@ Line ldata[] = {
        0.0, 0.0, 0.0}}}
 };
 Sector sdata[] = {
-    {&(ldata[0]), 8, -50, 50, {0, 0},
+    {&(ldata[0]), 8, {50, -50}, {1, 1}, {0x92, 0},
         {{0.0, 0.0}, {0.0, 0.0}},
         {{1.0, 0.0,
           0.0, 1.0},
          {1.0, 0.0,
           0.0, 1.0}}},
-    {&(ldata[8]), 4, -60, 40, {0, 0},
+    {&(ldata[8]), 4, {40, -60}, {0, 0}, {0xC0, 0x03},
         {{0.0, 0.0}, {0.0, 0.0}},
         {{1.0, 0.0,
           0.0, 1.0},
@@ -276,7 +288,7 @@ void engine_load() {
     v.pos.y /= (*s)[0].numlines;
     v.angle = 0.0;
     v.fov = FOV;
-    v.height = v.start->floor_h + VIEW_HEIGHT;
+    v.height = v.start->height[1] + VIEW_HEIGHT;
 }
 
 Axis find_slope(float angle, float *slope) {
@@ -450,6 +462,20 @@ float get_distance(Point *pos, Point *hit) {
     return(sqrtf(fabs(powf(hit->y - pos->y, 2.0)) + fabs(powf(hit->x - pos->x, 2.0))));
 }
 
+void set_tex(unsigned char num,
+             unsigned char **data,
+             unsigned char *mask,
+             unsigned char *dim) {
+    *dim = load_tex(num, data);
+    if(*dim == 64) {
+        *mask = 0x3F;
+        *dim = 6;
+    } else if(*dim == 32) {
+        *mask = 0x1F;
+        *dim = 5;
+    }
+}
+
 void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     Sector *s, *last_s;
     float angle;
@@ -470,23 +496,23 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     float ceilingdiff;
     float floordiff;
     float next_y;
-    int floor_tex = -1;
-    int floor_dim = 0;
-    int floor_mask = 0;
+    unsigned char floor_tex = 0;
+    unsigned char floor_dim = 0;
+    unsigned char floor_mask = 0;
     unsigned char *floor_data = NULL;
-    int ceiling_tex = -1;
-    int ceiling_dim = 0;
-    int ceiling_mask = 0;
+    unsigned char ceiling_tex = 0;
+    unsigned char ceiling_dim = 0;
+    unsigned char ceiling_mask = 0;
     unsigned char *ceiling_data = NULL;
-    int top_wall_tex = -1;
-    int top_wall_dim = 0;
-    int top_wall_mask = 0;
-    unsigned char *top_wall_data = NULL;
-    int bottom_wall_tex = -1;
-    int bottom_wall_dim = 0;
-    int bottom_wall_mask = 0;
-    unsigned char *bottom_wall_data = NULL;
-    unsigned char color;
+    unsigned char top_line_tex = 0;
+    unsigned char top_line_dim = 0;
+    unsigned char top_line_mask = 0;
+    unsigned char *top_line_data = NULL;
+    unsigned char bottom_line_tex = 0;
+    unsigned char bottom_line_dim = 0;
+    unsigned char bottom_line_mask = 0;
+    unsigned char *bottom_line_data = NULL;
+    unsigned short color;
 
     float h_2 = (float)h / 2.0;
     float fov_2 = v.fov / 2.0;
@@ -506,29 +532,6 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
         axis = find_slope(angle, &slope);
 
         s = v.start;
-        if(s->texture[0] != ceiling_tex) {
-            ceiling_tex = s->texture[0];
-            ceiling_dim = load_tex(ceiling_tex, &ceiling_data);
-            if(ceiling_dim == 64) {
-                ceiling_mask = 0x3F;
-                ceiling_dim = 6;
-            } else if(ceiling_dim == 32) {
-                ceiling_mask = 0x1F;
-                ceiling_dim = 5;
-            }
-        }
-        if(s->texture[1] != floor_tex) {
-            floor_tex = s->texture[1];
-            floor_dim = load_tex(floor_tex, &floor_data);
-            if(floor_dim == 64) {
-                floor_mask = 0x3F;
-                floor_dim = 6;
-            } else if(floor_dim == 32) {
-                floor_mask = 0x1F;
-                floor_dim = 5;
-            }
-        }
-
         last_s = NULL;
         top = 0;
         bottom = h - 1;
@@ -536,6 +539,16 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
         pos.y = v.pos.y;
         accumulated_distance = 0.0;
         while (1) {
+            /* get sector textures */
+            if(s->texture[0] != ceiling_tex) {
+                ceiling_tex = s->texture[0];
+                set_tex(ceiling_tex, &ceiling_data, &ceiling_mask, &ceiling_dim);
+            }
+            if(s->texture[1] != floor_tex) {
+                floor_tex = s->texture[1];
+                set_tex(floor_tex, &floor_data, &floor_mask, &floor_dim);
+            }
+
             /* TODO: scan in to portal walls until solid wall or distance reached */
             line = scan_sector(s,
                                &pos, axis, slope,
@@ -560,7 +573,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
              * Texture X and Y lookup from offset from view given ray angle */
 
             /* draw ceiling */
-            ceilingdiff = s->ceiling_h - v.height;
+            ceilingdiff = s->height[0] - v.height;
             if(ceilingdiff > 0.0) {
                 for(y = top; y < h; y++) {
                     z = ceilingdiff / tanf((h_2 - y) * y_to_angle);
@@ -568,26 +581,36 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         break;
                     }
                     z /= compensation;
-                    wx = v.pos.x + (sin(angle) * z);
-                    wy = v.pos.y + (cos(angle) * z);
-                    tx = (wx * s->texture_transform[0].xx) +
-                         (wy * s->texture_transform[0].xy) +
-                         s->texture_bias[0].x;
-                    ty = (wx * s->texture_transform[0].yx) +
-                         (wy * s->texture_transform[0].yy) +
-                         s->texture_bias[0].y;
                     if(ceiling_dim == 0) {
-                        pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
+                        color = 0x00;
                     } else {
+                        wx = v.pos.x + (sin(angle) * z);
+                        wy = v.pos.y + (cos(angle) * z);
+                        tx = (wx * s->texture_transform[0].xx) +
+                             (wy * s->texture_transform[0].xy) +
+                             s->texture_bias[0].x;
+                        ty = (wx * s->texture_transform[0].yx) +
+                             (wy * s->texture_transform[0].yy) +
+                             s->texture_bias[0].y;
                         color = ceiling_data[(ty & ceiling_mask) << ceiling_dim | (tx & ceiling_mask)];
-                        pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03);
                     }
+                    if(s->shade[0] & 0xFF00) {
+                        color = ~color; /* invert bits */
+                        color &= 0xDB; /* unset overflow bits */
+                        color += s->shade[0] & 0xFF; /* add which should subtract when inverted back? */
+                        color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
+                        color = ~color; /* invert back */
+                    } else {
+                        color += s->shade[0]; /* add */
+                        color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
+                    }
+                    pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
                 }
                 top = y;
             }
 
             /* draw floor */
-            floordiff = s->floor_h - v.height;
+            floordiff = s->height[1] - v.height;
             if(floordiff < 0.0) {
                 for(y = bottom; y >= 0; y--) {
                     z = -floordiff / tanf((y - h_2) * y_to_angle);
@@ -595,35 +618,92 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         break;
                     }
                     z /= compensation;
-                    wx = v.pos.x + (sin(angle) * z);
-                    wy = v.pos.y + (cos(angle) * z);
-                    tx = (wx * s->texture_transform[1].xx) +
-                         (wy * s->texture_transform[1].xy) +
-                         s->texture_bias[1].x;
-                    ty = (wx * s->texture_transform[1].yx) +
-                         (wy * s->texture_transform[1].yy) +
-                         s->texture_bias[1].y;
                     if(floor_dim == 0) {
-                        pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
+                        color = 0x00;
                     } else {
+                        wx = v.pos.x + (sin(angle) * z);
+                        wy = v.pos.y + (cos(angle) * z);
+                        tx = (wx * s->texture_transform[1].xx) +
+                             (wy * s->texture_transform[1].xy) +
+                             s->texture_bias[1].x;
+                        ty = (wx * s->texture_transform[1].yx) +
+                             (wy * s->texture_transform[1].yy) +
+                             s->texture_bias[1].y;
                         color = floor_data[(ty & floor_mask) << floor_dim | (tx & floor_mask)];
-                        pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03);
                     }
- 
+                    if(s->shade[1] & 0xFF00) {
+                        color = ~color; /* invert bits */
+                        color &= 0xDB; /* unset overflow bits */
+                        color += s->shade[1] & 0xFF; /* add which should subtract when inverted back? */
+                        color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
+                        color = ~color; /* invert back */
+                    } else {
+                        color += s->shade[1]; /* add */
+                        color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
+                    }
+                    pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
                 }
                 bottom = y;
             }
 
+            /* get top wall texture as this'll most likely be needed */
+            if(line->texture[0] != top_line_tex) {
+                top_line_tex = line->texture[0];
+                set_tex(top_line_tex, &top_line_data, &top_line_mask, &top_line_dim);
+            }
+
             if(line->sector == NULL) {
                 /* solid wall, no sector on the other side */
-
+    
                 /* draw wall */
                 wx = v.pos.x + (sin(angle) * total_distance);
                 wy = v.pos.y + (cos(angle) * total_distance);
                 for(y = top;
                     y <= bottom && y < h;
                     y++) {
-                    wz = ((y - h_2) * y_to_angle) * total_distance - v.height;
+                    if(top_line_dim == 0) {
+                        color = 0x00;
+                    } else {
+                        wz = ((y - h_2) * y_to_angle) * total_distance - v.height;
+                        tx = (wx * line->texture_transform[0].xx) +
+                             (wy * line->texture_transform[0].xy) +
+                             (wz * line->texture_transform[0].xz) +
+                             line->texture_bias[0].x;
+                        ty = (wx * line->texture_transform[0].yx) +
+                             (wy * line->texture_transform[0].yy) +
+                             (wz * line->texture_transform[0].yz) +
+                             line->texture_bias[0].y;
+                        color = top_line_data[(ty & top_line_mask) << top_line_dim | (tx & top_line_mask)];
+                    }
+                    if(line->shade[0] & 0xFF00) {
+                        color = ~color; /* invert bits */
+                        color &= 0xDB; /* unset overflow bits */
+                        color += line->shade[0] & 0xFF; /* add which should subtract when inverted back? */
+                        color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
+                        color = ~color; /* invert back */
+                    } else {
+                        color += line->shade[0]; /* add */
+                        color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
+                    }
+                    pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
+                }
+                break;
+            }
+            last_s = s;
+            s = line->sector;
+
+            /* draw top wall */
+            wx = v.pos.x + (sin(angle) * total_distance);
+            wy = v.pos.y + (cos(angle) * total_distance);
+            ceilingdiff = s->height[0] - v.height;
+            next_y = atan2f(total_distance, ceilingdiff) * angle_to_y - h_2;
+            for(y = top;
+                y <= next_y && y < h;
+                y++) {
+                if(top_line_dim == 0) {
+                    color = 0x00;
+                } else {
+                    wz = ((y - h_2) * y_to_angle) * total_distance;
                     tx = (wx * line->texture_transform[0].xx) +
                          (wy * line->texture_transform[0].xy) +
                          (wz * line->texture_transform[0].xz) +
@@ -632,76 +712,62 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                          (wy * line->texture_transform[0].yy) +
                          (wz * line->texture_transform[0].yz) +
                          line->texture_bias[0].y;
-                    pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
+                    color = top_line_data[(ty & top_line_mask) << top_line_dim | (tx & top_line_mask)];
                 }
-                break;
-            }
-            last_s = s;
-            s = line->sector;
-
-            if(s->texture[0] != ceiling_tex) {
-                ceiling_tex = s->texture[0];
-                ceiling_dim = load_tex(ceiling_tex, &ceiling_data);
-                if(ceiling_dim == 64) {
-                floor_dim = 0x3F;
-                    ceiling_mask = 0x3F;
-                    ceiling_dim = 6;
-                } else if(ceiling_dim == 32) {
-                    ceiling_mask = 0x1F;
-                    ceiling_dim = 5;
+                if(line->shade[0] & 0xFF00) {
+                    color = ~color; /* invert bits */
+                    color &= 0xDB; /* unset overflow bits */
+                    color += line->shade[0] & 0xFF; /* add which should subtract when inverted back? */
+                    color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
+                    color = ~color; /* invert back */
+                } else {
+                    color += line->shade[0]; /* add */
+                    color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                 }
-            }
-            if(s->texture[1] != floor_tex) {
-                floor_tex = s->texture[1];
-                floor_dim = load_tex(floor_tex, &floor_data);
-                if(floor_dim == 64) {
-                    floor_mask = 0x3F;
-                    floor_dim = 6;
-                } else if(floor_dim == 32) {
-                    floor_mask = 0x1F;
-                    floor_dim = 5;
-                }
-            }
-
-            /* draw top wall */
-            wx = v.pos.x + (sin(angle) * total_distance);
-            wy = v.pos.y + (cos(angle) * total_distance);
-            ceilingdiff = s->ceiling_h - v.height;
-            next_y = atan2f(total_distance, ceilingdiff) * angle_to_y - h_2;
-            for(y = top;
-                y <= next_y && y < h;
-                y++) {
-                wz = ((y - h_2) * y_to_angle) * total_distance;
-                tx = (wx * line->texture_transform[0].xx) +
-                     (wy * line->texture_transform[0].xy) +
-                     (wz * line->texture_transform[0].xz) +
-                     line->texture_bias[0].x;
-                ty = (wx * line->texture_transform[0].yx) +
-                     (wy * line->texture_transform[0].yy) +
-                     (wz * line->texture_transform[0].yz) +
-                     line->texture_bias[0].y;
-                pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
+                pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
             }
             top = y;
 
             /* draw bottom wall */
             wx = v.pos.x + (sin(angle) * total_distance);
             wy = v.pos.y + (cos(angle) * total_distance);
-            floordiff = s->floor_h - v.height;
+            floordiff = s->height[1] - v.height;
             next_y = atan2f(total_distance, floordiff) * angle_to_y - h_2;
+            if(next_y < bottom) {
+                /* bottom wall texture will be needed */
+                if(line->texture[1] != bottom_line_tex) {
+                    bottom_line_tex = line->texture[1];
+                    set_tex(bottom_line_tex, &bottom_line_data, &bottom_line_mask, &bottom_line_dim);
+                }
+            }
             for(y = bottom;
                 y >= next_y && y >= 0;
                 y--) {
-                wz = ((y - h_2) * y_to_angle) * total_distance;
-                tx = (wx * line->texture_transform[1].xx) +
-                     (wy * line->texture_transform[1].xy) +
-                     (wz * line->texture_transform[1].xz) +
-                     line->texture_bias[1].x;
-                ty = (wx * line->texture_transform[1].yx) +
-                     (wy * line->texture_transform[1].yy) +
-                     (wz * line->texture_transform[1].yz) +
-                     line->texture_bias[1].y;
-                pixels[y * pitch + x] = 0xC0 | ((tx ^ ty) & 0x3F);
+                if(bottom_line_dim == 0) {
+                    color = 0x00;
+                } else {
+                    wz = ((y - h_2) * y_to_angle) * total_distance;
+                    tx = (wx * line->texture_transform[1].xx) +
+                         (wy * line->texture_transform[1].xy) +
+                         (wz * line->texture_transform[1].xz) +
+                         line->texture_bias[1].x;
+                    ty = (wx * line->texture_transform[1].yx) +
+                         (wy * line->texture_transform[1].yy) +
+                         (wz * line->texture_transform[1].yz) +
+                         line->texture_bias[1].y;
+                    color = bottom_line_data[(ty & bottom_line_mask) << bottom_line_dim | (tx & bottom_line_mask)];
+                }
+                if(line->shade[1] & 0xFF00) {
+                    color = ~color; /* invert bits */
+                    color &= 0xDB; /* unset overflow bits */
+                    color += line->shade[1] & 0xFF; /* add which should subtract when inverted back? */
+                    color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
+                    color = ~color; /* invert back */
+                } else {
+                    color += line->shade[1]; /* add */
+                    color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
+                }
+                pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
             }
             bottom = y;
 
@@ -789,7 +855,7 @@ void engine_move(float x, float y) {
     v.pos.x = x;
     v.pos.y = y;
     v.start = s;
-    v.height = s->floor_h + VIEW_HEIGHT;
+    v.height = s->height[1] + VIEW_HEIGHT;
 }
 
 /* only compile these if detected that it's using the broken pebble SDK math */
@@ -885,4 +951,6 @@ float atan2approx(float y,float x) {
       return 0.0;
     }
 }
+
+/* TODO it seems fmodf crashes on the watch too but it's rare, could be a division by 0? */
 #endif

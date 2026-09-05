@@ -111,7 +111,7 @@ int load_graphic(int number, unsigned char *data) {
         /* ....#### -> ##.## .## <- ##...... */
         data[out+2] = ((data[in+1] & 0x0C) << 4) | ((data[in+1] & 0x03) << 3) | ((data[in+2] & 0xC0) >> 6);
         /* ..###### -> ##.##.## */
-        data[out+3] = ((data[in+2] & 0x30) << 2) | ((data[in+2] & 0xC0) << 1) | (data[in+2] & 0x03);
+        data[out+3] = ((data[in+2] & 0x30) << 2) | ((data[in+2] & 0x0C) << 1) | (data[in+2] & 0x03);
         out += 4;
     }
 

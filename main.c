@@ -45,9 +45,9 @@
 #include "log.h"
 #include "cache.h"
 
-SDL_Surface *load_png_checked(int number) {
+SDL_Surface *load_png_checked(unsigned char number) {
     char name[16];
-    snprintf(name, sizeof(name), "tex%d.png", number);
+    snprintf(name, sizeof(name), "tex%hhd.png", number);
 
     SDL_Surface *png = SDL_LoadPNG(name);
     if(png == NULL) {
@@ -70,7 +70,8 @@ SDL_Surface *load_png_checked(int number) {
     return(png);
 }
 
-int get_graphic_dim(int number) {
+int get_graphic_dim(unsigned char number) {
+    LOG("%hhd\n", number);
     SDL_Surface *png = load_png_checked(number);
     if(png == NULL) {
         return(-1);
@@ -82,7 +83,7 @@ int get_graphic_dim(int number) {
     return(width);
 }
 
-int load_graphic(int number, unsigned char *data) {
+int load_graphic(unsigned char number, unsigned char *data) {
     int y, x;
     unsigned char pixel;
 
@@ -186,7 +187,7 @@ int main(int argc, char **argv) {
     }
     engine_load();
 
-    log_quiet = 1;
+    log_quiet = 0;
 
     while(running) {
         if(redraw) {

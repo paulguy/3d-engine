@@ -32,19 +32,20 @@ typedef struct Line_s {
     Point *point;
     Sector *sector;
 
-    int texture[2];
+    unsigned char texture[2];
+    short shade[2];
     Point texture_bias[2];
     Matrix3x2 texture_transform[2];
 } Line;
 
 typedef struct Sector_s {
     Line (*line)[];
-    int numlines;
+    unsigned char numlines;
 
-    float floor_h;
-    float ceiling_h;
+    float height[2];
 
-    int texture[2];
+    unsigned char texture[2];
+    short shade[2];
     Point texture_bias[2];
     Matrix2x2 texture_transform[2];
 } Sector;
