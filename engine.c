@@ -104,7 +104,6 @@ Matrix2x2 (*m22)[] = NULL;
 Matrix3x2 (*m32)[] = NULL;
 Line (*l)[] = NULL;
 Sector (*s)[] = NULL;
-unsigned short *li = NULL;
 
 open_map_t open_map_p;
 read_map_t read_map_p;
@@ -154,6 +153,7 @@ typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
     unsigned short texture_bias[2];
     unsigned short texture_transform[2];
 
+    unsigned short firstline;
     unsigned char lines;
 } Sector_data;
 
@@ -183,8 +183,8 @@ typedef union {
     View_data v;
 } Data;
 
-void print_data(Header *h) {
-    int i, j;
+static void print_data(Header *h) {
+    int i;
 
     LOG("%hu %hu %hu %hu %hu %hu %hu\n", h->points, h->matrix2x2s, h->matrix3x2s, h->lines, h->sectors, h->links, h->views);
 
@@ -210,17 +210,13 @@ void print_data(Header *h) {
     }
 
     for(i = 0; i < h->sectors; i++) {
-        LOG("%d Sector %p %f %f %hu %hu %hu %hu %p %p %p %p\n", i,
+        LOG("%d Sector %p %f %f %hu %hu %hu %hu %p %p %p %p %p %hhu\n", i,
             &(*s)[i], (*s)[i].height[0], (*s)[i].height[1],
             (*s)[i].texture[0], (*s)[i].texture[1],
             (*s)[i].shade[0], (*s)[i].shade[1],
             (*s)[i].texture_bias[0], (*s)[i].texture_bias[1],
-            (*s)[i].texture_transform[0], (*s)[i].texture_transform[1]);
-        LOG("Lines %hhu ", (*s)[i].lines);
-        for(j = 0; j < (*s)[i].lines; j++) {
-            LOG(" %hu", (*s)[i].line[j]);
-        }
-        LOG("\n");
+            (*s)[i].texture_transform[0], (*s)[i].texture_transform[1],
+            (*s)[i].firstline, (*s)[i].lines);
     }
 
     LOG("View %p %f %f %f %f %f %f\n",
@@ -232,10 +228,7 @@ int engine_load(unsigned char number, unsigned char view) {
     Header h;
     Data d;
     int i;
-    unsigned int lineindexes = 0;
-    unsigned int lineindexpos = 0;
     off_t start = 0;
-    off_t lines_start;
 
     if(p != NULL) {
         free(s);
@@ -243,7 +236,6 @@ int engine_load(unsigned char number, unsigned char view) {
         free(m32);
         free(m22);
         free(p);
-        free(li);
     }
 
     if(open_map_p(number) < 0) {
@@ -324,9 +316,8 @@ int engine_load(unsigned char number, unsigned char view) {
     }
 
     start += sizeof(Line_data) * h.lines;
-    lines_start = start;
     for(i = 0; i < h.sectors; i++) {
-        read_map_p(start, sizeof(Sector_data), &d.s);
+        read_map_p(start + (i * sizeof(Sector_data)), sizeof(Sector_data), &d.s);
         d.s.lines += 3; /* 3 lines minimum so 0 is 3 mines */
         (*s)[i].height[0] = d.s.height[0];
         (*s)[i].height[1] = d.s.height[1];
@@ -338,33 +329,17 @@ int engine_load(unsigned char number, unsigned char view) {
         (*s)[i].texture_bias[1] = &(*p)[d.s.texture_bias[1]];
         (*s)[i].texture_transform[0] = &(*m22)[d.s.texture_transform[0]];
         (*s)[i].texture_transform[1] = &(*m22)[d.s.texture_transform[1]];
+        (*s)[i].firstline = &(*l)[d.s.firstline];
         (*s)[i].lines = d.s.lines;
-        /* line indexes will be filled in with a second pass to allocate all the memory in 1 go */
-        lineindexes += d.s.lines;
-        start += sizeof(Line_data) + (sizeof(short) * d.s.lines);
     }
 
-    /* allocate the whole block */
-    li = malloc(sizeof(short) * lineindexes);
-    if(li == NULL) {
-        goto error_sectors;
-    }
-
-    /* load the line chunks in the line indexes block and point each sector lines pointer to it */
-    start = lines_start;
-    for(i = 0; i < h.sectors; i++) {
-        read_map_p(start + sizeof(Sector_data), sizeof(short) * (*s)[i].lines, &li[lineindexpos]);
-        (*s)[i].line = &li[lineindexpos];
-        lineindexpos += (*s)[i].lines;
-        start += sizeof(Sector_data) + (sizeof(short) * (*s)[i].lines);
-    }
-
+    start += sizeof(Sector_data) * h.sectors;
     for(i = 0; i < h.links; i++) {
         read_map_p(start + (i * sizeof(Link_data)), sizeof(Link_data), &d.li);
         /* link first sector to second */
-        (*l)[(*s)[d.li.sector].line[d.li.line]].sector = &(*s)[d.li.lsector];
+        (*s)[d.li.sector].firstline[d.li.line].sector = &(*s)[d.li.lsector];
         /* link second sector to first */
-        (*l)[(*s)[d.li.lsector].line[d.li.lline]].sector = &(*s)[d.li.sector];
+        (*s)[d.li.lsector].firstline[d.li.lline].sector = &(*s)[d.li.sector];
     }
 
     start += sizeof(Link_data) * h.links;
@@ -380,12 +355,15 @@ int engine_load(unsigned char number, unsigned char view) {
     /* get the player's world height */
     v.height = v.start->height[1] + v.startheight;
 
+    close_map_p();
+
     print_data(&h);
+    LOG("Memory in bytes - Points %d Matrix2x2s %d Matrix3x2s %d Lines %d Sectors %d Total %d\n",
+         h.points * sizeof(Point), h.matrix2x2s * sizeof(Matrix2x2), h.matrix3x2s * sizeof(Matrix3x2), h.lines * sizeof(Line), h.sectors * sizeof(Sector),
+        (h.points * sizeof(Point)) + (h.matrix2x2s * sizeof(Matrix2x2)) + (h.matrix3x2s * sizeof(Matrix3x2)) + (h.lines * sizeof(Line)) + (h.sectors * sizeof(Sector)));
 
     return(0);
 
-error_sectors:
-    free(s);
 error_lines:
     free(l);
 error_m32s:
@@ -541,12 +519,12 @@ Line *scan_sector(Sector *s,
     Line *line;
     int i;
 
-    point = (*l)[s->line[0]].point;
+    point = s->firstline->point;
     for(i = 0; i < s->lines; i++) {
-        line = &(*l)[s->line[i]];
+        line = &s->firstline[i];
 
         /* current line spans from the current point to the next line point */
-        nextpoint = (*l)[s->line[(i + 1) % s->lines]].point;
+        nextpoint = s->firstline[(i + 1) % s->lines].point;
 
         /* don't check for lines that would look back towards the previous sector */
         if(last_s != NULL && line->sector == last_s) {

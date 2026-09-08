@@ -33,13 +33,16 @@ def get_named(T : Type,
         offset = int(offsetstr)
 
     if name.isidentifier():
-        index = T.named[name]
+        try:
+            index = T.named[name]
+        except KeyError:
+            raise IndexError(f"{linenum}: {name} isn't a valid identifier.")
     elif get_index:
         # even if this is for getting a named object, it could still be used on its own to just fetch an index from storage
         try:
             index = int(name)
         except ValueError:
-            raise ValueError(f"{linenum}: {name} wasn't a valid identifier nor index.")
+            raise ValueError(f"{linenum}: {name} isn't a valid integer index.")
     else:
         return None, token
 
@@ -158,11 +161,15 @@ def parse_shade(tokens : list[str], token : int) -> tuple[int, int]:
     return ((r << 6) | (g << 3) | b) * mul, nexttoken
 
 def shade_str(val : int) -> str:
-    return f"{'-' if val < 0 else ''}{(val & 0xC0) >> 6}{(val & 0x18) >> 3}{val & 0x03}"
+    negative : bool = False
+    if val < 0:
+        val = -val
+        negative = True
+    return f"{'-' if negative else ''}{(val & 0xC0) >> 6}{(val & 0x18) >> 3}{val & 0x03}"
 
 def make_shade(val : int) -> int:
     if val < 0:
-        return 0xFF00 | (val & 0xFF)
+        return 0xFF00 | (-val & 0xFF)
 
     return val & 0xFF
 
@@ -314,14 +321,14 @@ class Sector:
     shade : tuple[int, int]
     texture_bias : tuple[int, int]
     texture_transform : tuple[int, int]
-    lines : list[int]
+    firstline : int
+    lines : int
 
     storage = []
     named = {}
     aliases = None
 
-    STRUCT = struct.Struct("<ffBBHHHHHHB")
-    LINE_STRUCT = struct.Struct("<H")
+    STRUCT = struct.Struct("<ffBBHHHHHHHB")
 
     def serialize(self):
         return Sector.STRUCT.pack(self.height[0], self.height[1],
@@ -329,13 +336,12 @@ class Sector:
                                   make_shade(self.shade[0]), make_shade(self.shade[1]),
                                   self.texture_bias[0], self.texture_bias[1],
                                   self.texture_transform[0], self.texture_transform[1],
-                                  len(self.lines) - 3) + \
-               b''.join(Sector.LINE_STRUCT.pack(l) for l in self.lines)
+                                  self.firstline, self.lines - 3)
 
     def __str__(self):
         return f"Ceiling Height {self.height[0]}  Ceiling Texture {self.textures[0]} {shade_str(self.shade[0])} {self.texture_bias[0]} {self.texture_transform[0]}  " \
                f"Floor Height {self.height[1]}  Floor Texture {self.textures[1]} {shade_str(self.shade[1])} {self.texture_bias[1]} {self.texture_transform[1]}  " \
-               f"Lines {', '.join(str(l) for l in self.lines)}"
+               f"First Line {self.firstline}  Lines {self.lines}"
 
     @staticmethod
     def parse(tokens : list[str], token : int) -> tuple[Sector, int]:
@@ -350,7 +356,6 @@ class Sector:
         texture_transform1 : int
         texture_transform2 : int
         linecount : int
-        linelist : list[int] = []
 
         linenum : int
         line : Line
@@ -368,19 +373,17 @@ class Sector:
         texture_bias2, token = get_named(Point, tokens, token, "texture bias", get_index=True)
         texture_transform2, token = get_named(Matrix2x2, tokens, token, "texture transform", get_index=True)
 
+        line, token = get_named(Line, tokens, token, "first line", get_index=True)
         linecount, token = get_single(int, tokens, token, "line count")
         if linecount < 3:
             raise ValueError(f"{linenum}: A sector needs at least 3 lines, or up to 259.")
-        for i in range(linecount):
-            line, token = get_named(Line, tokens, token, "line list", get_index=True)
-            linelist.append(line)
 
         return Sector(height,
                       (texture1, texture2),
                       (shade1, shade2),
                       (texture_bias1, texture_bias2),
                       (texture_transform1, texture_transform2),
-                      linelist), token
+                      line, linecount), token
 
 @dataclass(frozen=True)
 class Link:
@@ -396,52 +399,63 @@ class Link:
     STRUCT = struct.Struct("<HHHH")
 
     def serialize(self):
-        return Link.STRUCT.pack(sector, line, lsector, lline)
+        return Link.STRUCT.pack(self.sector, self.line, self.lsector, self.lline)
 
     def __str__(self):
-        return f"First Sector:Line {self.sector}:{self.line}  Second Sector:Line {self.sector}:{self.line}"
+        return f"First Sector:Line {self.sector}:{self.line}  Second Sector:Line {self.lsector}:{self.lline}"
 
     @staticmethod
     def parse(tokens : list[str], token : int) -> tuple[Line, int]:
+        sectorindex : int
         sector : int
         line : int
+        lsectorindex : int
         lsector : int
         lline : int
         found : bool
         lindex : int
         llindex : int
+        line1points : tuple[int, int]
+        line2points : tuple[int, int]
 
-        sector, token = get_named(Sector, tokens, token, "sector", get_index=True)
+        sectorindex, token = get_named(Sector, tokens, token, "sector", get_index=True)
+        sector = Sector.storage[sectorindex]
         line, token = get_named(Line, tokens, token, "line", get_index=True)
-        lsector, token = get_named(Sector, tokens, token, "link sector", get_index=True)
+        lsectorindex, token = get_named(Sector, tokens, token, "link sector", get_index=True)
+        lsector = Sector.storage[lsectorindex]
         lline, token = get_named(Line, tokens, token, "link line", get_index=True)
 
         #find lines in each sector
         found = False
-        for n, l in enumerate(sector.lines):
+        for n, l in enumerate(range(sector.firstline, sector.firstline + sector.lines)):
             if line == l:
                 lindex = n
                 found = True
                 break
         if not found:
-            raise ValueError(f"{linenum}: Line {line} is not in sector {sector}.")
+            raise ValueError(f"{linenum}: Line {line} is not in sector {sectorindex}.")
 
         found = False
-        for n, l in enumerate(lsector.lines):
+        for n, l in enumerate(range(lsector.firstline, lsector.firstline + lsector.lines)):
             if lline == l:
                 llindex = n
                 found = True
                 break
         if not found:
-            raise ValueError(f"{linenum}: Line {lline} is not in sector {lsector}.")
+            raise ValueError(f"{linenum}: Line {lline} is not in sector {lsectorindex}.")
 
-        # make sure the coordinates line up
-        # duplicate lines aren't added so they only need to be compared by index
-        if line != lsector.lines[(llindex + 1) % len(lsector.lines)] or \
-           lline != sector.lines[(lindex + 1) % len(sector.lines)]:
-            raise ValueError(f"{linenum}: Linked walls must have same coordinates.")
+        # make sure lines share points
+        line1points = (Line.storage[sector.firstline + lindex].point,
+                       Line.storage[sector.firstline + ((lindex + 1) % sector.lines)].point)
+        line2points = (Line.storage[lsector.firstline + llindex].point,
+                       Line.storage[lsector.firstline + ((llindex + 1) % lsector.lines)].point)
 
-        return Link(sector, line, lsector, lline), token
+        # sector lines are clockwise so linked walls will share opposite points
+        if line1points[0] != line2points[1] or \
+           line2points[1] != line1points[0]:
+            raise ValueError(f"{linenum}: Linked walls must share points. Have: {line1points[0]}-{line1points[1]}, {line2points[0]}-{line2points[1]}")
+
+        return Link(sectorindex, lindex, lsectorindex, llindex), token
 
 @dataclass(frozen=True)
 class View:

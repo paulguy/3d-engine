@@ -1,7 +1,7 @@
 Texture as solid 0
 Texture as test_pattern 1
 
-Point as octagon_point -32 128
+Point as octagon -32 128
 Point 32 128
 Point 128 32
 Point 128 -32
@@ -10,12 +10,12 @@ Point -32 -128
 Point -128 -32
 Point -128 32
 
+Point as hallway1 -32 512
+Point 32 512
+
 point as player_start 0.0 0.0
 point as no_scroll 0.0 0.0
 
-Matrix2x2 as ceiling
--1.0 0.0
-0.0 1.0
 Matrix2x2 as floor
 1.0 0.0
 0.0 1.0
@@ -45,34 +45,54 @@ Matrix3x2 as northwest
 0.7 0.7 0.0
 0.0 0.0 1.0
 
-Line as octagon octagon_point
+Line as octagon octagon
 test_pattern 000 no_scroll north
 test_pattern 000 no_scroll north
-Line octagon_point+1
+Line octagon+1
 test_pattern 333 no_scroll northeast
 test_pattern 000 no_scroll northeast
-Line octagon_point+2
+Line octagon+2
 test_pattern 222 no_scroll east
 test_pattern 000 no_scroll east
-Line octagon_point+3
+Line octagon+3
 test_pattern 111 no_scroll southeast
 test_pattern 000 no_scroll southeast
-Line octagon_point+4
+Line octagon+4
 test_pattern 000 no_scroll south
 test_pattern 000 no_scroll south
-Line octagon_point+5
+Line octagon+5
 test_pattern 300 no_scroll southwest
 test_pattern 000 no_scroll southwest
-Line octagon_point+6
+Line octagon+6
 test_pattern 030 no_scroll west
 test_pattern 000 no_scroll west
-Line octagon_point+7
-test_pattern 003 no_scroll northeast
-test_pattern 000 no_scroll northeast
+Line octagon+7
+test_pattern 003 no_scroll northwest
+test_pattern 000 no_scroll northwest
 
-Sector as octagon_room 64 0
-test_pattern 000 no_scroll ceiling
+Sector as octagon 64 0
 test_pattern 000 no_scroll floor
-8 octagon octagon+1 octagon+2 octagon+3 octagon+4 octagon+5 octagon+6 octagon+7 
+test_pattern 000 no_scroll floor
+octagon 8
 
-View octagon_room player_start 0.0 32.0 90.0
+Line as hallway1 hallway1
+test_pattern -111 no_scroll north
+test_pattern 000 no_scroll north
+Line hallway1+1
+test_pattern -111 no_scroll east
+test_pattern 000 no_scroll east
+Line octagon+1
+test_pattern -111 no_scroll south
+test_pattern 000 no_scroll south
+Line octagon
+test_pattern -111 no_scroll west
+test_pattern 000 no_scroll west
+
+Sector as hallway1 64 0
+test_pattern -111 no_scroll floor
+test_pattern -111 no_scroll floor
+hallway1 4
+
+link octagon octagon hallway1 hallway1+2
+
+View octagon player_start 0.0 32.0 90.0

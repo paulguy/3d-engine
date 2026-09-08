@@ -41,7 +41,7 @@ typedef struct Line_s {
 } Line;
 
 typedef struct Sector_s {
-    unsigned short *line;
+    Line *firstline;
     unsigned char lines;
 
     float height[2];
