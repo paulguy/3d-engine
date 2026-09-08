@@ -1,3 +1,5 @@
+#include <sys/types.h>
+
 /* pebble SDK doesn't define this by default */
 #if !defined(M_PI)
 #define BROKEN_MATH
@@ -34,32 +36,41 @@ typedef struct Line_s {
 
     unsigned char texture[2];
     short shade[2];
-    Point texture_bias[2];
-    Matrix3x2 texture_transform[2];
+    Point *texture_bias[2];
+    Matrix3x2 *texture_transform[2];
 } Line;
 
 typedef struct Sector_s {
-    Line (*line)[];
-    unsigned char numlines;
+    unsigned short *line;
+    unsigned char lines;
 
     float height[2];
 
     unsigned char texture[2];
     short shade[2];
-    Point texture_bias[2];
-    Matrix2x2 texture_transform[2];
+    Point *texture_bias[2];
+    Matrix2x2 *texture_transform[2];
 } Sector;
 
 typedef struct {
     Sector *start;
     Point pos;
     float angle;
+    float startheight;
     float height;
 
     float fov;
 } View;
 
-void engine_load();
+typedef int (* open_map_t)(unsigned char number);
+typedef int (* read_map_t)(off_t offset, ssize_t length, void *data);
+typedef void (* close_map_t)();
+
+extern open_map_t open_map_p;
+extern read_map_t read_map_p;
+extern close_map_t close_map_p;
+
+int engine_load(unsigned char number, unsigned char view);
 void engine_render(unsigned char *pixels, int w, int h, int pitch);
 void engine_move(float x, float y);
 

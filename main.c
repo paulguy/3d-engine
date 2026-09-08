@@ -36,6 +36,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 
 #include <SDL3/SDL.h>
@@ -103,6 +104,36 @@ int load_graphic(unsigned char number, unsigned char *data) {
     SDL_DestroySurface(png);
 
     return(0);
+}
+
+FILE *mapfile = NULL;
+
+int open_map(unsigned char number) {
+    char name[16];
+    snprintf(name, sizeof(name), "map%hhd.bin", number);
+
+    mapfile = fopen(name, "rb");
+    if(mapfile == NULL) {
+        return(-1);
+    }
+
+    return(0);
+}
+
+int read_map(off_t offset, ssize_t length, void *data) {
+    if(fseek(mapfile, offset, SEEK_SET) < 0) {
+        return(-1);
+    }
+
+    if(fread(data, 1, length, mapfile) < length) {
+        return(-1);
+    }
+
+    return(0);
+}
+
+void close_map() {
+    fclose(mapfile);
 }
 
 int main(int argc, char **argv) {
@@ -177,6 +208,9 @@ int main(int argc, char **argv) {
     }
 
     /* setup wrapper function pointers */
+    open_map_p = open_map;
+    read_map_p = read_map;
+    close_map_p = close_map;
     get_graphic_dim_p = get_graphic_dim;
     load_graphic_p = load_graphic;
     /* allocate texture memory */
@@ -185,7 +219,8 @@ int main(int argc, char **argv) {
         LOG("Failed to allocate texture memory.\n");
         goto error_init;
     }
-    engine_load();
+    /* map 0 view 0 */
+    engine_load(0, 0);
 
     log_quiet = 0;
 

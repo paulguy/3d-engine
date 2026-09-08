@@ -76,6 +76,7 @@
  *     array of per unit float deltas for horizontal rays (calculated per frame)
  */
 
+#include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
@@ -85,7 +86,6 @@
 #include "cache.h"
 
 #define FOV (90.0 / 360.0 * (M_PI * 2.0))
-#define VIEW_HEIGHT (50)
 
 typedef enum {
     AXIS_PX,
@@ -94,201 +94,310 @@ typedef enum {
     AXIS_NY
 } Axis;
 
-/* something about texture caching
+/*
  * loading zones
  */
 
-/* these here temporarily for testing */
-Point pdata[] = {
-    {-50, 150},
-    {50, 150},
-    {150, 50},
-    {150, -50},
-    {50, -150},
-    {-50, -150},
-    {-150, -50},
-    {-150, 50},
-    {-50, 300},
-    {50, 300}
-};
-Line ldata[] = {
-    {0, 1,
-     {1, 1},
-     {0, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{1.0, 0.0, 0.0,
-       0.0, 0.0, 1.0},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}},
-    {1, 99999,
-     {1, 1},
-     {0x192, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{0.7, -0.7, 0.0,
-       0.0, 0.0, 1.0},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}},
-    {2, 99999,
-     {1, 1},
-     {0x149, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{0.0, 0.25, 0.0,
-       0.0, 0.0, 0.25},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}},
-    {3, 99999,
-     {1, 1},
-     {0, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{0.7, 0.7, 0.0,
-       0.0, 0.0, 1.0},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}},
-    {4, 99999,
-     {1, 1},
-     {0x49, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{1.0, 0.0, 0.0,
-       0.0, 0.0, 1.0},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}},
-    {5, 99999,
-     {1, 1},
-     {0x92, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{0.7, -0.7, 0.0,
-       0.0, 0.0, 1.0},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}},
-    {6, 99999,
-     {1, 1},
-     {0x108, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{0.0, 1.0, 0.0,
-       0.0, 0.0, 1.0},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}},
-    {7, 99999,
-     {1, 1},
-     {0x08, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{0.7, 0.7, 0.0,
-       0.0, 0.0, 1.0},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}},
-
-    {8, 99999,
-     {1, 1},
-     {0, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{1.0, 0.0, 0.0,
-       0.0, 0.0, 1.0},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}},
-    {9, 99999,
-     {1, 1},
-     {0, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{0.0, 1.0, 0.0,
-       0.0, 0.0, 1.0},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}},
-    {1, 0,
-     {1, 1},
-     {0, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0},
-      {1.0, 0.0, 0.0,
-       0.0, 0.0, 1.0}}},
-    {0, 99999,
-     {1, 1},
-     {0, 0},
-     {{0.0, 0.0},
-      {0.0, 0.0}},
-     {{0.0, 1.0, 0.0,
-       0.0, 0.0, 1.0},
-      {0.0, 0.0, 0.0,
-       0.0, 0.0, 0.0}}}
-};
-Sector sdata[] = {
-    {&(ldata[0]), 8, {50, -50}, {1, 1}, {0x92, 0},
-        {{0.0, 0.0}, {0.0, 0.0}},
-        {{1.0, 0.0,
-          0.0, 1.0},
-         {1.0, 0.0,
-          0.0, 1.0}}},
-    {&(ldata[8]), 4, {40, -60}, {0, 0}, {0xC0, 0x03},
-        {{0.0, 0.0}, {0.0, 0.0}},
-        {{1.0, 0.0,
-          0.0, 1.0},
-         {1.0, 0.0,
-          0.0, 1.0}}}
-};
-
 View v;
-Point (*p)[] = &pdata;
-Line (*l)[] = &ldata;
-int numlines = sizeof(ldata) / sizeof(Line);
-Sector (*s)[] = &sdata;
-int numsectors = sizeof(sdata) / sizeof(Sector);
+Point (*p)[] = NULL;
+Matrix2x2 (*m22)[] = NULL;
+Matrix3x2 (*m32)[] = NULL;
+Line (*l)[] = NULL;
+Sector (*s)[] = NULL;
+unsigned short *li = NULL;
 
-void print_sectors() {
+open_map_t open_map_p;
+read_map_t read_map_p;
+close_map_t close_map_p;
+
+/* these are all packed in the file, so very efficient access isn't necessary */
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    unsigned short points;
+    unsigned short matrix2x2s;
+    unsigned short matrix3x2s;
+    unsigned short lines;
+    unsigned short sectors;
+    unsigned short links;
+    unsigned short views;
+} Header;
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    float x, y;
+} Point_data;
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    float xx, xy;
+    float yx, yy;
+} Matrix2x2_data;
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    float xx, xy, xz;
+    float yx, yy, yz;
+} Matrix3x2_data;
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    unsigned short point;
+    /* sectors are lined by a separate link table */
+
+    unsigned char texture[2];
+    short shade[2];
+    unsigned short texture_bias[2];
+    unsigned short texture_transform[2];
+} Line_data;
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    float height[2];
+
+    unsigned char texture[2];
+    short shade[2];
+    unsigned short texture_bias[2];
+    unsigned short texture_transform[2];
+
+    unsigned char lines;
+} Sector_data;
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    unsigned short sector;
+    unsigned short line;
+    unsigned short lsector;
+    unsigned short lline;
+} Link_data;
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    unsigned short start;
+    unsigned short pos;
+    float angle;
+    float startheight;
+
+    float fov;
+} View_data;
+
+typedef union {
+    Point_data p;
+    Matrix2x2_data m22;
+    Matrix3x2_data m32;
+    Line_data l;
+    Sector_data s;
+    Link_data li;
+    View_data v;
+} Data;
+
+void print_data(Header *h) {
     int i, j;
 
-    for(i = 0; i < numsectors; i++) {
-        LOG("Sector %d\n", i);
-        for(j = 0; j < (*s)[i].numlines; j++) {
-            LOG("%f, %f  ", (*(*s)[i].line)[j].point->x, (*(*s)[i].line)[j].point->y);
+    LOG("%hu %hu %hu %hu %hu %hu %hu\n", h->points, h->matrix2x2s, h->matrix3x2s, h->lines, h->sectors, h->links, h->views);
+
+    for(i = 0; i < h->points; i++) {
+        LOG("%d Point %p %f %f\n", i, &(*p)[i], (*p)[i].x, (*p)[i].y);
+    }
+
+    for(i = 0; i < h->matrix2x2s; i++) {
+        LOG("%d Matrix2x2 %p %f %f %f %f\n", i, &(*m22)[i], (*m22)[i].xx, (*m22)[i].xy, (*m22)[i].yx, (*m22)[i].yy);
+    }
+
+    for(i = 0; i < h->matrix3x2s; i++) {
+        LOG("%d Matrix3x2 %p %f %f %f %f %f %f\n", i, &(*m32)[i], (*m32)[i].xx, (*m32)[i].xy, (*m32)[i].xz, (*m32)[i].yx, (*m32)[i].yy, (*m32)[i].yz);
+    }
+
+    for(i = 0; i < h->lines; i++) {
+        LOG("%d Line %p %p %p %hu %hu %hu %hu %p %p %p %p\n", i,
+            &(*l)[i], (*l)[i].point, (*l)[i].sector,
+            (*l)[i].texture[0], (*l)[i].texture[1],
+            (*l)[i].shade[0], (*l)[i].shade[1],
+            (*l)[i].texture_bias[0], (*l)[i].texture_bias[1],
+            (*l)[i].texture_transform[0], (*l)[i].texture_transform[1]);
+    }
+
+    for(i = 0; i < h->sectors; i++) {
+        LOG("%d Sector %p %f %f %hu %hu %hu %hu %p %p %p %p\n", i,
+            &(*s)[i], (*s)[i].height[0], (*s)[i].height[1],
+            (*s)[i].texture[0], (*s)[i].texture[1],
+            (*s)[i].shade[0], (*s)[i].shade[1],
+            (*s)[i].texture_bias[0], (*s)[i].texture_bias[1],
+            (*s)[i].texture_transform[0], (*s)[i].texture_transform[1]);
+        LOG("Lines %hhu ", (*s)[i].lines);
+        for(j = 0; j < (*s)[i].lines; j++) {
+            LOG(" %hu", (*s)[i].line[j]);
         }
         LOG("\n");
     }
+
+    LOG("View %p %f %f %f %f %f %f\n",
+        v.start, v.pos.x, v.pos.y,
+        v.angle, v.startheight, v.height, v.fov);
 }
 
-void engine_load() {
+int engine_load(unsigned char number, unsigned char view) {
+    Header h;
+    Data d;
     int i;
-    /* TODO: load from file/resource */
+    unsigned int lineindexes = 0;
+    unsigned int lineindexpos = 0;
+    off_t start = 0;
+    off_t lines_start;
 
-    /* indices to pointers */
-    for(i = 0; i < numlines; i++) {
-        if((*l)[i].sector > numsectors) {
-            (*l)[i].sector = NULL;
-        } else {
-            (*l)[i].sector = &(*s)[(intptr_t)(*l)[i].sector];
-        }
+    if(p != NULL) {
+        free(s);
+        free(l);
+        free(m32);
+        free(m22);
+        free(p);
+        free(li);
     }
 
-    for(i = 0; i < numlines; i++) {
-        (*l)[i].point = &(*p)[(intptr_t)(*l)[i].point];
+    if(open_map_p(number) < 0) {
+        goto error;
     }
-/*
-    print_sectors();
-    */
 
-    /* temporarily place view at center of first sector */
-    v.start = &(*s)[0];
-    v.pos.x = 0.0;
-    v.pos.y = 0.0;
-    for(i = 0; i < (*s)[0].numlines; i++) {
-        v.pos.x += (*(*s)[0].line)[i].point->x;
-        v.pos.y += (*(*s)[0].line)[i].point->y;
+    /* don't bother checking return values because
+     * there isn't much that can be done on a read failure and it
+     * won't work and won't be published */
+    read_map_p(0, sizeof(Header), &h);
+
+    p = malloc(h.points * sizeof(Point));
+    if(p == NULL) {
+        goto error_open;
     }
-    v.pos.x /= (*s)[0].numlines;
-    v.pos.y /= (*s)[0].numlines;
-    v.angle = 0.0;
-    v.fov = FOV;
-    v.height = v.start->height[1] + VIEW_HEIGHT;
+
+    m22 = malloc(h.matrix2x2s * sizeof(Matrix2x2));
+    if(m22 == NULL) {
+        goto error_points;
+    }
+
+    m32 = malloc(h.matrix3x2s * sizeof(Matrix3x2));
+    if(m32 == NULL) {
+        goto error_m22s;
+    }
+
+    l = malloc(h.lines * sizeof(Line));
+    if(l == NULL) {
+        goto error_m32s;
+    }
+
+    s = malloc(h.sectors * sizeof(Sector));
+    if(s == NULL) {
+        goto error_lines;
+    }
+
+    start += sizeof(Header);
+    for(i = 0; i < h.points; i++) {
+        read_map_p(start + (i * sizeof(Point_data)), sizeof(Point_data), &d.p);
+        (*p)[i].x = d.p.x;
+        (*p)[i].y = d.p.y;
+    }
+
+    start += sizeof(Point_data) * h.points;
+    for(i = 0; i < h.matrix2x2s; i++) {
+        read_map_p(start + (i * sizeof(Matrix2x2_data)), sizeof(Matrix2x2_data), &d.m22);
+        (*m22)[i].xx = d.m22.xx;
+        (*m22)[i].xy = d.m22.xy;
+        (*m22)[i].yx = d.m22.yx;
+        (*m22)[i].yy = d.m22.yy;
+    }
+
+    start += sizeof(Matrix2x2_data) * h.matrix2x2s;
+    for(i = 0; i < h.matrix3x2s; i++) {
+        read_map_p(start + (i * sizeof(Matrix3x2_data)), sizeof(Matrix3x2_data), &d.m32);
+        (*m32)[i].xx = d.m32.xx;
+        (*m32)[i].xy = d.m32.xy;
+        (*m32)[i].xz = d.m32.xz;
+        (*m32)[i].yx = d.m32.yx;
+        (*m32)[i].yy = d.m32.yy;
+        (*m32)[i].yz = d.m32.yz;
+    }
+
+    start += sizeof(Matrix3x2_data) * h.matrix3x2s;
+    for(i = 0; i < h.lines; i++) {
+        read_map_p(start + (i * sizeof(Line_data)), sizeof(Line_data), &d.l);
+        (*l)[i].point = &(*p)[d.l.point];
+        /* sector will be filled when links are read */
+        (*l)[i].sector = NULL;
+        (*l)[i].texture[0] = d.l.texture[0];
+        (*l)[i].texture[1] = d.l.texture[1];
+        (*l)[i].shade[0] = d.l.shade[0];
+        (*l)[i].shade[1] = d.l.shade[1];
+        (*l)[i].texture_bias[0] = &(*p)[d.l.texture_bias[0]];
+        (*l)[i].texture_bias[1] = &(*p)[d.l.texture_bias[1]];
+        (*l)[i].texture_transform[0] = &(*m32)[d.l.texture_transform[0]];
+        (*l)[i].texture_transform[1] = &(*m32)[d.l.texture_transform[1]];
+    }
+
+    start += sizeof(Line_data) * h.lines;
+    lines_start = start;
+    for(i = 0; i < h.sectors; i++) {
+        read_map_p(start, sizeof(Sector_data), &d.s);
+        d.s.lines += 3; /* 3 lines minimum so 0 is 3 mines */
+        (*s)[i].height[0] = d.s.height[0];
+        (*s)[i].height[1] = d.s.height[1];
+        (*s)[i].texture[0] = d.s.texture[0];
+        (*s)[i].texture[1] = d.s.texture[1];
+        (*s)[i].shade[0] = d.s.shade[0];
+        (*s)[i].shade[1] = d.s.shade[1];
+        (*s)[i].texture_bias[0] = &(*p)[d.s.texture_bias[0]];
+        (*s)[i].texture_bias[1] = &(*p)[d.s.texture_bias[1]];
+        (*s)[i].texture_transform[0] = &(*m22)[d.s.texture_transform[0]];
+        (*s)[i].texture_transform[1] = &(*m22)[d.s.texture_transform[1]];
+        (*s)[i].lines = d.s.lines;
+        /* line indexes will be filled in with a second pass to allocate all the memory in 1 go */
+        lineindexes += d.s.lines;
+        start += sizeof(Line_data) + (sizeof(short) * d.s.lines);
+    }
+
+    /* allocate the whole block */
+    li = malloc(sizeof(short) * lineindexes);
+    if(li == NULL) {
+        goto error_sectors;
+    }
+
+    /* load the line chunks in the line indexes block and point each sector lines pointer to it */
+    start = lines_start;
+    for(i = 0; i < h.sectors; i++) {
+        read_map_p(start + sizeof(Sector_data), sizeof(short) * (*s)[i].lines, &li[lineindexpos]);
+        (*s)[i].line = &li[lineindexpos];
+        lineindexpos += (*s)[i].lines;
+        start += sizeof(Sector_data) + (sizeof(short) * (*s)[i].lines);
+    }
+
+    for(i = 0; i < h.links; i++) {
+        read_map_p(start + (i * sizeof(Link_data)), sizeof(Link_data), &d.li);
+        /* link first sector to second */
+        (*l)[(*s)[d.li.sector].line[d.li.line]].sector = &(*s)[d.li.lsector];
+        /* link second sector to first */
+        (*l)[(*s)[d.li.lsector].line[d.li.lline]].sector = &(*s)[d.li.sector];
+    }
+
+    start += sizeof(Link_data) * h.links;
+    /* read the selected view */
+    read_map_p(start + (view * sizeof(View_data)), sizeof(View_data), &d.v);
+    v.start = &(*s)[d.v.start];
+    v.pos.x = (*p)[d.v.pos].x;
+    v.pos.y = (*p)[d.v.pos].y;
+    v.angle = d.v.angle;
+    v.startheight = d.v.startheight;
+    v.fov = d.v.fov / 360.0 * M_PI * 2.0;
+
+    /* get the player's world height */
+    v.height = v.start->height[1] + v.startheight;
+
+    print_data(&h);
+
+    return(0);
+
+error_sectors:
+    free(s);
+error_lines:
+    free(l);
+error_m32s:
+    free(m32);
+error_m22s:
+    free(m22);
+error_points:
+    free(p);
+error_open:
+    close_map_p();
+error:
+    return(-1);
 }
 
 Axis find_slope(float angle, float *slope) {
@@ -432,12 +541,12 @@ Line *scan_sector(Sector *s,
     Line *line;
     int i;
 
-    point = (*s->line)[0].point;
-    for(i = 0; i < s->numlines; i++) {
-        line = &(*s->line)[i];
+    point = (*l)[s->line[0]].point;
+    for(i = 0; i < s->lines; i++) {
+        line = &(*l)[s->line[i]];
 
         /* current line spans from the current point to the next line point */
-        nextpoint = (*s->line)[(i + 1) % s->numlines].point;
+        nextpoint = (*l)[s->line[(i + 1) % s->lines]].point;
 
         /* don't check for lines that would look back towards the previous sector */
         if(last_s != NULL && line->sector == last_s) {
@@ -513,6 +622,9 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     unsigned char bottom_line_mask = 0;
     unsigned char *bottom_line_data = NULL;
     unsigned short color;
+    Point *texture_bias;
+    Matrix2x2 *texture_transform_22;
+    Matrix3x2 *texture_transform_32;
 
     float h_2 = (float)h / 2.0;
     float fov_2 = v.fov / 2.0;
@@ -538,18 +650,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
         pos.x = v.pos.x;
         pos.y = v.pos.y;
         accumulated_distance = 0.0;
-        while (1) {
-            /* get sector textures */
-            if(s->texture[0] != ceiling_tex) {
-                ceiling_tex = s->texture[0];
-                set_tex(ceiling_tex, &ceiling_data, &ceiling_mask, &ceiling_dim);
-            }
-            if(s->texture[1] != floor_tex) {
-                floor_tex = s->texture[1];
-                set_tex(floor_tex, &floor_data, &floor_mask, &floor_dim);
-            }
-
-            /* TODO: scan in to portal walls until solid wall or distance reached */
+        while (true) {
             line = scan_sector(s,
                                &pos, axis, slope,
                                last_s,
@@ -575,6 +676,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             /* draw ceiling */
             ceilingdiff = s->height[0] - v.height;
             if(ceilingdiff > 0.0) {
+                /* get sector textures */
+                if(s->texture[0] != ceiling_tex) {
+                    ceiling_tex = s->texture[0];
+                    set_tex(ceiling_tex, &ceiling_data, &ceiling_mask, &ceiling_dim);
+                }
+ 
+                texture_bias = s->texture_bias[0];
+                texture_transform_22 = s->texture_transform[0];
                 for(y = top; y < h; y++) {
                     z = ceilingdiff / tanf((h_2 - y) * y_to_angle);
                     if(z >= total_distance) {
@@ -586,12 +695,12 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     } else {
                         wx = v.pos.x + (sin(angle) * z);
                         wy = v.pos.y + (cos(angle) * z);
-                        tx = (wx * s->texture_transform[0].xx) +
-                             (wy * s->texture_transform[0].xy) +
-                             s->texture_bias[0].x;
-                        ty = (wx * s->texture_transform[0].yx) +
-                             (wy * s->texture_transform[0].yy) +
-                             s->texture_bias[0].y;
+                        tx = (wx * texture_transform_22->xx) +
+                             (wy * texture_transform_22->xy) +
+                             texture_bias->x;
+                        ty = (wx * texture_transform_22->yx) +
+                             (wy * texture_transform_22->yy) +
+                             texture_bias->y;
                         color = ceiling_data[(ty & ceiling_mask) << ceiling_dim | (tx & ceiling_mask)];
                     }
                     if(s->shade[0] & 0xFF00) {
@@ -612,6 +721,13 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             /* draw floor */
             floordiff = s->height[1] - v.height;
             if(floordiff < 0.0) {
+                if(s->texture[1] != floor_tex) {
+                    floor_tex = s->texture[1];
+                    set_tex(floor_tex, &floor_data, &floor_mask, &floor_dim);
+                }
+
+                texture_bias = s->texture_bias[1];
+                texture_transform_22 = s->texture_transform[1];
                 for(y = bottom; y >= 0; y--) {
                     z = -floordiff / tanf((y - h_2) * y_to_angle);
                     if(z >= total_distance) {
@@ -623,12 +739,12 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     } else {
                         wx = v.pos.x + (sin(angle) * z);
                         wy = v.pos.y + (cos(angle) * z);
-                        tx = (wx * s->texture_transform[1].xx) +
-                             (wy * s->texture_transform[1].xy) +
-                             s->texture_bias[1].x;
-                        ty = (wx * s->texture_transform[1].yx) +
-                             (wy * s->texture_transform[1].yy) +
-                             s->texture_bias[1].y;
+                        tx = (wx * texture_transform_22->xx) +
+                             (wy * texture_transform_22->xy) +
+                             texture_bias->x;
+                        ty = (wx * texture_transform_22->yx) +
+                             (wy * texture_transform_22->yy) +
+                             texture_bias->y;
                         color = floor_data[(ty & floor_mask) << floor_dim | (tx & floor_mask)];
                     }
                     if(s->shade[1] & 0xFF00) {
@@ -658,6 +774,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 /* draw wall */
                 wx = v.pos.x + (sin(angle) * total_distance);
                 wy = v.pos.y + (cos(angle) * total_distance);
+                texture_bias = line->texture_bias[0];
+                texture_transform_32 = line->texture_transform[0];
                 for(y = top;
                     y <= bottom && y < h;
                     y++) {
@@ -665,14 +783,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         color = 0x00;
                     } else {
                         wz = ((y - h_2) * y_to_angle) * total_distance - v.height;
-                        tx = (wx * line->texture_transform[0].xx) +
-                             (wy * line->texture_transform[0].xy) +
-                             (wz * line->texture_transform[0].xz) +
-                             line->texture_bias[0].x;
-                        ty = (wx * line->texture_transform[0].yx) +
-                             (wy * line->texture_transform[0].yy) +
-                             (wz * line->texture_transform[0].yz) +
-                             line->texture_bias[0].y;
+                        tx = (wx * texture_transform_32->xx) +
+                             (wy * texture_transform_32->xy) +
+                             (wz * texture_transform_32->xz) +
+                             texture_bias->x;
+                        ty = (wx * texture_transform_32->yx) +
+                             (wy * texture_transform_32->yy) +
+                             (wz * texture_transform_32->yz) +
+                             texture_bias->y;
                         color = top_line_data[(ty & top_line_mask) << top_line_dim | (tx & top_line_mask)];
                     }
                     if(line->shade[0] & 0xFF00) {
@@ -697,6 +815,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             wy = v.pos.y + (cos(angle) * total_distance);
             ceilingdiff = s->height[0] - v.height;
             next_y = atan2f(total_distance, ceilingdiff) * angle_to_y - h_2;
+            texture_bias = line->texture_bias[0];
+            texture_transform_32 = line->texture_transform[0];
             for(y = top;
                 y <= next_y && y < h;
                 y++) {
@@ -704,14 +824,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     color = 0x00;
                 } else {
                     wz = ((y - h_2) * y_to_angle) * total_distance;
-                    tx = (wx * line->texture_transform[0].xx) +
-                         (wy * line->texture_transform[0].xy) +
-                         (wz * line->texture_transform[0].xz) +
-                         line->texture_bias[0].x;
-                    ty = (wx * line->texture_transform[0].yx) +
-                         (wy * line->texture_transform[0].yy) +
-                         (wz * line->texture_transform[0].yz) +
-                         line->texture_bias[0].y;
+                    tx = (wx * texture_transform_32->xx) +
+                         (wy * texture_transform_32->xy) +
+                         (wz * texture_transform_32->xz) +
+                         texture_bias->x;
+                    ty = (wx * texture_transform_32->yx) +
+                         (wy * texture_transform_32->yy) +
+                         (wz * texture_transform_32->yz) +
+                         texture_bias->y;
                     color = top_line_data[(ty & top_line_mask) << top_line_dim | (tx & top_line_mask)];
                 }
                 if(line->shade[0] & 0xFF00) {
@@ -739,6 +859,9 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     bottom_line_tex = line->texture[1];
                     set_tex(bottom_line_tex, &bottom_line_data, &bottom_line_mask, &bottom_line_dim);
                 }
+
+                texture_bias = line->texture_bias[1];
+                texture_transform_32 = line->texture_transform[1];
             }
             for(y = bottom;
                 y >= next_y && y >= 0;
@@ -747,14 +870,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     color = 0x00;
                 } else {
                     wz = ((y - h_2) * y_to_angle) * total_distance;
-                    tx = (wx * line->texture_transform[1].xx) +
-                         (wy * line->texture_transform[1].xy) +
-                         (wz * line->texture_transform[1].xz) +
-                         line->texture_bias[1].x;
-                    ty = (wx * line->texture_transform[1].yx) +
-                         (wy * line->texture_transform[1].yy) +
-                         (wz * line->texture_transform[1].yz) +
-                         line->texture_bias[1].y;
+                    tx = (wx * texture_transform_32->xx) +
+                         (wy * texture_transform_32->xy) +
+                         (wz * texture_transform_32->xz) +
+                         texture_bias->x;
+                    ty = (wx * texture_transform_32->yx) +
+                         (wy * texture_transform_32->yy) +
+                         (wz * texture_transform_32->yz) +
+                         texture_bias->y;
                     color = bottom_line_data[(ty & bottom_line_mask) << bottom_line_dim | (tx & bottom_line_mask)];
                 }
                 if(line->shade[1] & 0xFF00) {
@@ -855,7 +978,7 @@ void engine_move(float x, float y) {
     v.pos.x = x;
     v.pos.y = y;
     v.start = s;
-    v.height = s->height[1] + VIEW_HEIGHT;
+    v.height = s->height[1] + v.startheight;
 }
 
 /* only compile these if detected that it's using the broken pebble SDK math */

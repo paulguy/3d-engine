@@ -1,0 +1,78 @@
+Texture as solid 0
+Texture as test_pattern 1
+
+Point as octagon_point -32 128
+Point 32 128
+Point 128 32
+Point 128 -32
+Point 32 -128
+Point -32 -128
+Point -128 -32
+Point -128 32
+
+point as player_start 0.0 0.0
+point as no_scroll 0.0 0.0
+
+Matrix2x2 as ceiling
+-1.0 0.0
+0.0 1.0
+Matrix2x2 as floor
+1.0 0.0
+0.0 1.0
+
+Matrix3x2 as north
+1.0 0.0 0.0
+0.0 0.0 1.0
+Matrix3x2 as northeast
+0.7 -0.7 0.0
+0.0 0.0 1.0
+Matrix3x2 as east
+0.0 -1.0 0.0
+0.0 0.0 1.0
+Matrix3x2 as southeast
+-0.7 -0.7 0.0
+0.0 0.0 1.0
+Matrix3x2 as south
+-1.0 0.0 0.0
+0.0 0.0 1.0
+Matrix3x2 as southwest
+-0.7 0.7 0.0
+0.0 0.0 1.0
+Matrix3x2 as west
+0.0 1.0 0.0
+0.0 0.0 1.0
+Matrix3x2 as northwest
+0.7 0.7 0.0
+0.0 0.0 1.0
+
+Line as octagon octagon_point
+test_pattern 000 no_scroll north
+test_pattern 000 no_scroll north
+Line octagon_point+1
+test_pattern 333 no_scroll northeast
+test_pattern 000 no_scroll northeast
+Line octagon_point+2
+test_pattern 222 no_scroll east
+test_pattern 000 no_scroll east
+Line octagon_point+3
+test_pattern 111 no_scroll southeast
+test_pattern 000 no_scroll southeast
+Line octagon_point+4
+test_pattern 000 no_scroll south
+test_pattern 000 no_scroll south
+Line octagon_point+5
+test_pattern 300 no_scroll southwest
+test_pattern 000 no_scroll southwest
+Line octagon_point+6
+test_pattern 030 no_scroll west
+test_pattern 000 no_scroll west
+Line octagon_point+7
+test_pattern 003 no_scroll northeast
+test_pattern 000 no_scroll northeast
+
+Sector as octagon_room 64 0
+test_pattern 000 no_scroll ceiling
+test_pattern 000 no_scroll floor
+8 octagon octagon+1 octagon+2 octagon+3 octagon+4 octagon+5 octagon+6 octagon+7 
+
+View octagon_room player_start 0.0 32.0 90.0
