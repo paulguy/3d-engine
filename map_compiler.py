@@ -2,6 +2,7 @@
 
 import sys
 from dataclasses import dataclass
+from enum import Enum
 import struct
 import pathlib
 
@@ -173,6 +174,67 @@ def make_shade(val : int) -> int:
 
     return val & 0xFF
 
+class Action(Enum):
+    NONE = 0x00
+    WARP = 0x01
+    WAYPOINT = 0x02
+
+def parse_action(tokens : list[str], token : int) -> tuple[int, int]:
+    nexttoken : int
+    actionstr : str
+    sector : int
+
+    try:
+        actionstr, token = get_single(str, tokens, token, "action")
+    except NotEnoughTokens:
+        # action token is optional, so just return none and don't consume tokens rather than error
+        return 0, token
+
+    match actionstr.lower():
+        case "none":
+            return Action.NONE.value, token
+        case "warp":
+            args, token = get_multi(tuple, (int, int), tokens, token, "warp destination")
+            # 0x01 <8:map> <8:view>
+            return Action.WARP.value | \
+                   ((int(args[0]) & 0xFF) << 8) | \
+                   ((int(args[1]) & 0xFF) << 16), token
+        case "waypoint":
+            point, token = get_named(Line, tokens, token, "first point", get_index=True)
+            count = 1 # default to 1, to set waypoint only to the single first point
+            try:
+                count, token = get_single(int, tokens, token, "waypoint")
+                count = int(count)
+            except NotEnoughTokens:
+                # count is optional
+                pass
+            except ValueError:
+                # next should be a keyword, and count is optional
+                pass
+            # 0x02 <16:first point> <8:count>
+            # map count starting at 1
+            return Action.WAYPOINT.value | \
+                   ((int(point) & 0xFFFF) << 8) | \
+                   (((int(count) - 1) & 0xFF) << 24), token
+
+    # this implies an action is the last, optional argument to a sector
+    # so if none matched, then it's just assumed to be the start of the next
+    # declaration, as none share a name.  This is probably fragile..
+    # subtract one to unconsume the token
+    return 0, token - 1
+
+def action_str(action : int) -> str:
+    match Action(action & 0xFF):
+        case Action.NONE:
+            return "None"
+        case Action.WARP:
+            return f"Warp Map {(action & 0xFF00) >> 8} View {(action & 0xFF0000) >> 16}"
+        case Action.WAYPOINT:
+            return f"Waypoint First Point {(action & 0xFFFF00) >> 8} Count {(action & 0xFF000000) >> 24}"
+
+    # shouldn't happen
+    return "Unknown"
+
 @dataclass(frozen=True)
 class Point:
     x : float
@@ -323,12 +385,13 @@ class Sector:
     texture_transform : tuple[int, int]
     firstline : int
     lines : int
+    action : int
 
     storage = []
     named = {}
     aliases = None
 
-    STRUCT = struct.Struct("<ffBBHHHHHHHB")
+    STRUCT = struct.Struct("<ffBBHHHHHHHBI")
 
     def serialize(self):
         return Sector.STRUCT.pack(self.height[0], self.height[1],
@@ -336,12 +399,14 @@ class Sector:
                                   make_shade(self.shade[0]), make_shade(self.shade[1]),
                                   self.texture_bias[0], self.texture_bias[1],
                                   self.texture_transform[0], self.texture_transform[1],
-                                  self.firstline, self.lines - 3)
+                                  self.firstline, self.lines - 3,
+                                  self.action)
 
     def __str__(self):
         return f"Ceiling Height {self.height[0]}  Ceiling Texture {self.textures[0]} {shade_str(self.shade[0])} {self.texture_bias[0]} {self.texture_transform[0]}  " \
                f"Floor Height {self.height[1]}  Floor Texture {self.textures[1]} {shade_str(self.shade[1])} {self.texture_bias[1]} {self.texture_transform[1]}  " \
-               f"First Line {self.firstline}  Lines {self.lines}"
+               f"First Line {self.firstline}  Lines {self.lines}  " \
+               f"Action {action_str(self.action)}"
 
     @staticmethod
     def parse(tokens : list[str], token : int) -> tuple[Sector, int]:
@@ -356,6 +421,7 @@ class Sector:
         texture_transform1 : int
         texture_transform2 : int
         linecount : int
+        action : int
 
         linenum : int
         line : Line
@@ -378,12 +444,14 @@ class Sector:
         if linecount < 3:
             raise ValueError(f"{linenum}: A sector needs at least 3 lines, or up to 259.")
 
+        action, token = parse_action(tokens, token)
+
         return Sector(height,
                       (texture1, texture2),
                       (shade1, shade2),
                       (texture_bias1, texture_bias2),
                       (texture_transform1, texture_transform2),
-                      line, linecount), token
+                      line, linecount, action), token
 
 @dataclass(frozen=True)
 class Link:

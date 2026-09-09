@@ -81,11 +81,18 @@
 #include <stddef.h>
 #include <math.h>
 
+#ifdef BROKEN_MATH
+/* needed for heap_bytes_free() */
+#include <pebble.h>
+#endif
+
 #include "engine.h"
 #include "log.h"
 #include "cache.h"
 
-#define FOV (90.0 / 360.0 * (M_PI * 2.0))
+#define ACTION_NONE (0x00)
+#define ACTION_WARP (0x01)
+#define ACTION_WAYPOINT (0x02)
 
 typedef enum {
     AXIS_PX,
@@ -98,7 +105,9 @@ typedef enum {
  * loading zones
  */
 
+unsigned char mapnum;
 View v;
+Point waypoint;
 Point (*p)[] = NULL;
 Matrix2x2 (*m22)[] = NULL;
 Matrix3x2 (*m32)[] = NULL;
@@ -155,6 +164,8 @@ typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
 
     unsigned short firstline;
     unsigned char lines;
+
+    unsigned int action;
 } Sector_data;
 
 typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
@@ -210,18 +221,43 @@ static void print_data(Header *h) {
     }
 
     for(i = 0; i < h->sectors; i++) {
-        LOG("%d Sector %p %f %f %hu %hu %hu %hu %p %p %p %p %p %hhu\n", i,
+        LOG("%d Sector %p %f %f %hu %hu %hu %hu %p %p %p %p %p %hhu ", i,
             &(*s)[i], (*s)[i].height[0], (*s)[i].height[1],
             (*s)[i].texture[0], (*s)[i].texture[1],
             (*s)[i].shade[0], (*s)[i].shade[1],
             (*s)[i].texture_bias[0], (*s)[i].texture_bias[1],
             (*s)[i].texture_transform[0], (*s)[i].texture_transform[1],
             (*s)[i].firstline, (*s)[i].lines);
+        switch((*s)[i].action & 0xFF) {
+            case ACTION_NONE:
+                LOG("None\n");
+                break;
+            case ACTION_WARP:
+                LOG("Warp %hhu %hhu\n", ((*s)[i].action & 0xFF00) >> 8, ((*s)[i].action & 0xFF0000) >> 16);
+                break;
+            case ACTION_WAYPOINT:
+                LOG("Waypoint %hu %hhu\n", ((*s)[i].action & 0xFFFF00) >> 8, ((*s)[i].action & 0xFF000000) >> 24);
+                break;
+            default:
+                LOG("Unknown\n");
+        }
     }
 
     LOG("View %p %f %f %f %f %f %f\n",
         v.start, v.pos.x, v.pos.y,
         v.angle, v.startheight, v.height, v.fov);
+}
+
+void apply_view_data(View_data *vd) {
+    v.start = &(*s)[vd->start];
+    v.pos.x = (*p)[vd->pos].x;
+    v.pos.y = (*p)[vd->pos].y;
+    v.angle = vd->angle;
+    v.startheight = vd->startheight;
+    v.fov = vd->fov / 360.0 * M_PI * 2.0;
+
+    /* set the player's world height */
+    v.height = v.start->height[1] + v.startheight;
 }
 
 int engine_load(unsigned char number, unsigned char view) {
@@ -230,6 +266,11 @@ int engine_load(unsigned char number, unsigned char view) {
     int i;
     off_t start = 0;
 
+#ifdef BROKEN_MATH
+    /* pebble */
+    LOG("Pre-free %d bytes\n", heap_bytes_free());
+#endif
+
     if(p != NULL) {
         free(s);
         free(l);
@@ -237,6 +278,10 @@ int engine_load(unsigned char number, unsigned char view) {
         free(m22);
         free(p);
     }
+
+#ifdef BROKEN_MATH
+    LOG("Post-free %d bytes\n", heap_bytes_free());
+#endif
 
     if(open_map_p(number) < 0) {
         goto error;
@@ -331,6 +376,7 @@ int engine_load(unsigned char number, unsigned char view) {
         (*s)[i].texture_transform[1] = &(*m22)[d.s.texture_transform[1]];
         (*s)[i].firstline = &(*l)[d.s.firstline];
         (*s)[i].lines = d.s.lines;
+        (*s)[i].action = d.s.action;
     }
 
     start += sizeof(Sector_data) * h.sectors;
@@ -345,22 +391,20 @@ int engine_load(unsigned char number, unsigned char view) {
     start += sizeof(Link_data) * h.links;
     /* read the selected view */
     read_map_p(start + (view * sizeof(View_data)), sizeof(View_data), &d.v);
-    v.start = &(*s)[d.v.start];
-    v.pos.x = (*p)[d.v.pos].x;
-    v.pos.y = (*p)[d.v.pos].y;
-    v.angle = d.v.angle;
-    v.startheight = d.v.startheight;
-    v.fov = d.v.fov / 360.0 * M_PI * 2.0;
-
-    /* get the player's world height */
-    v.height = v.start->height[1] + v.startheight;
+    apply_view_data(&d.v);
 
     close_map_p();
 
+#ifdef BROKEN_MATH
+    LOG("Post-load %d bytes\n", heap_bytes_free());
+#else
     print_data(&h);
     LOG("Memory in bytes - Points %d Matrix2x2s %d Matrix3x2s %d Lines %d Sectors %d Total %d\n",
          h.points * sizeof(Point), h.matrix2x2s * sizeof(Matrix2x2), h.matrix3x2s * sizeof(Matrix3x2), h.lines * sizeof(Line), h.sectors * sizeof(Sector),
         (h.points * sizeof(Point)) + (h.matrix2x2s * sizeof(Matrix2x2)) + (h.matrix3x2s * sizeof(Matrix3x2)) + (h.lines * sizeof(Line)) + (h.sectors * sizeof(Sector)));
+#endif
+
+    mapnum = number;
 
     return(0);
 
@@ -883,6 +927,57 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     }
 }
 
+int do_action(Sector *s) {
+    switch(s->action) {
+        case ACTION_WARP:
+            unsigned char map = (s->action & 0xFF00) >> 8;
+            unsigned char view = (s->action & 0xFF0000) >> 16;
+            if(map == mapnum) {
+                /* views aren't stored, so load the view from file */
+
+                Header h;
+                View_data vd;
+                off_t start = 0;
+
+                /* don't bother chacking for error since this map had to have loaded before already.. */
+                open_map_p(mapnum);
+
+                read_map_p(0, sizeof(Header), &h);
+
+                if(view >= h.views) {
+                    return(0);
+                }
+
+                start = (h.points * sizeof(Point_data)) +
+                        (h.matrix2x2s * sizeof(Matrix2x2_data)) +
+                        (h.matrix3x2s * sizeof(Matrix3x2_data)) +
+                        (h.lines * sizeof(Line_data)) +
+                        (h.sectors * sizeof(Sector_data)) +
+                        (h.links * sizeof(Link_data));
+
+                read_map_p(start + (view * sizeof(View_data)), sizeof(View_data), &vd);
+                apply_view_data(&vd);
+
+                close_map_p();
+            } else {
+                engine_load(map, view);
+            }
+            return(1);
+        case ACTION_WAYPOINT:
+            unsigned short firstpoint = (s->action & 0xFFFF00) >> 8;
+            unsigned short count = (s->action & 0xFF000000) >> 24;
+            /* count is mapped to start at 1, avoids division by 0 */
+            count++;
+            /* pick a waypoint by random */
+            unsigned short selection = firstpoint + (rand() % count);
+            waypoint.x = (*p)[selection].x;
+            waypoint.y = (*p)[selection].y;
+            break;
+    }
+
+    return(0);
+}
+
 void engine_move(float x, float y) {
     Axis axis;
     float slope;
@@ -950,6 +1045,11 @@ void engine_move(float x, float y) {
         pos.y = hit.y;
         last_s = s;
         s = line->sector;
+
+        if(do_action(s)) {
+            /* action updated state, so this state is stale and movement is stopped */
+            return;
+        }
     }
 
     /* finally, update player position and sector */
@@ -990,7 +1090,7 @@ float fast_sqrt(float number) {
 }
 
 /* from wikipedia */
-float tanf(float angle) {
+float tanf_custom(float angle) {
     float sinangle = sin_lookup_wrapper(angle);
     return sinangle / fast_sqrt(1.0 - (sinangle * sinangle));
 }
@@ -1053,5 +1153,7 @@ float atan2approx(float y,float x) {
     }
 }
 
-/* TODO it seems fmodf crashes on the watch too but it's rare, could be a division by 0? */
+float fmodf_custom(float x, float y) {
+    return(((x / y) - ((int)x / (int)y)) * y);
+}
 #endif

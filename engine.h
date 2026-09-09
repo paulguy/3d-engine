@@ -1,16 +1,24 @@
-#include <sys/types.h>
-
+#ifdef PBL_SDK_3
 /* pebble SDK doesn't define this by default */
-#if !defined(M_PI)
-#define BROKEN_MATH
 /* copied from math.h */
 # define M_PI           3.14159265358979323846  /* pi */
 # define M_PI_2         1.57079632679489661923  /* pi/2 */
+
 /* pebble SDK has a broken math functions */
 #define sin(angle) sin_lookup_wrapper(angle)
 #define cos(angle) cos_lookup_wrapper(angle)
+#define tanf(angle) tanf_custom(angle)
 #define atan2f(y, x) atan2approx(y, x)
 #define sqrtf(number) fast_sqrt(number)
+#define fmodf(x, y) fmodf_custom(x, y)
+/* unmask the ifdef to compile these functions */
+#define BROKEN_MATH
+
+/* this contains off_t and size_t */
+#include <stdio.h>
+#else
+/* the sys/types.h from pebble SDK causes a compile error */
+#include <sys/types.h>
 #endif
 
 typedef struct {
@@ -50,6 +58,8 @@ typedef struct Sector_s {
     short shade[2];
     Point *texture_bias[2];
     Matrix2x2 *texture_transform[2];
+
+    unsigned int action;
 } Sector;
 
 typedef struct {
@@ -63,7 +73,7 @@ typedef struct {
 } View;
 
 typedef int (* open_map_t)(unsigned char number);
-typedef int (* read_map_t)(off_t offset, ssize_t length, void *data);
+typedef int (* read_map_t)(off_t offset, size_t length, void *data);
 typedef void (* close_map_t)();
 
 extern open_map_t open_map_p;
@@ -76,7 +86,9 @@ void engine_move(float x, float y);
 
 float sin_lookup_wrapper(float angle);
 float cos_lookup_wrapper(float angle);
+float tanf_custom(float angle);
 float atan2approx(float y,float x);
 float fast_sqrt(float number);
+float fmodf_custom(float x, float y);
 
 extern View v;

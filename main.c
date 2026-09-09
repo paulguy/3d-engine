@@ -120,7 +120,7 @@ int open_map(unsigned char number) {
     return(0);
 }
 
-int read_map(off_t offset, ssize_t length, void *data) {
+int read_map(off_t offset, size_t length, void *data) {
     if(fseek(mapfile, offset, SEEK_SET) < 0) {
         return(-1);
     }

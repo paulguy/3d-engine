@@ -45,19 +45,46 @@ static GFont s_font;
 static Layer *s_text_layer;
 static Layer *s_engine_layer;
 
+static ResHandle map;
+
 const unsigned char TEX_IDS[] = {
     RESOURCE_ID_TEX_0
 };
 #define MAX_TEX_ID (sizeof(TEX_IDS) - 1)
 
+const unsigned char MAP_IDS[] = {
+    RESOURCE_ID_MAP_0
+};
+#define MAX_MAP_ID (sizeof(MAP_IDS) - 1)
+
 #define SMALL_TEX_RES_SIZE (SMALL_TEX_SIZE / 4 * 3)
 #define LARGE_TEX_RES_SIZE (LARGE_TEX_SIZE / 4 * 3)
 
-int get_graphic_dim(int number) {
+int open_map(unsigned char number) {
+    if(number > MAX_MAP_ID) {
+        return(-1);
+    }
+
+    map = resource_get_handle(MAP_IDS[number]);
+
+    return(0);
+}
+
+int read_map(off_t offset, size_t length, void *data) {
+    if(resource_load_byte_range(map, offset, data, length) < length) {
+        return(-1);
+    }
+
+    return(0);
+}
+
+void close_map() {
+    /* nothing to do */
+}
+
+int get_graphic_dim(unsigned char number) {
     ResHandle handle;
     size_t res_size;
-
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d %d", number, MAX_TEX_ID);
 
     if(number > MAX_TEX_ID) {
         return(-1);
@@ -66,9 +93,6 @@ int get_graphic_dim(int number) {
     handle = resource_get_handle(TEX_IDS[number]);
 
     res_size = resource_size(handle);
-
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d %d", SMALL_TEX_RES_SIZE, LARGE_TEX_RES_SIZE);
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "%d", res_size);
 
     if(res_size == SMALL_TEX_RES_SIZE) {
         return(SMALL_TEX_DIM);
@@ -80,7 +104,7 @@ int get_graphic_dim(int number) {
     return(0);
 }
 
-int load_graphic(int number, unsigned char *data) {
+int load_graphic(unsigned char number, unsigned char *data) {
     unsigned int in, out;
     ResHandle handle;
     size_t res_size;
@@ -141,6 +165,9 @@ static void text_layer_update(struct Layer *layer, GContext *ctx) {
     clock_copy_time_string(timebuffer, sizeof(timebuffer));
     /* jank bounding box to make it center correctly */
     graphics_draw_text(ctx, timebuffer, s_font, GRect(3, -4, bounds.size.w - 3, bounds.size.h), GTextOverflowModeWordWrap, GTextAlignmentLeft, NULL);
+
+    /* signal engine view to update after updating the time display to ensure the time displayed is most current */
+    layer_mark_dirty(s_engine_layer);
 }
 
 void select_click_handler(ClickRecognizerRef recognizer, void *context) {
@@ -183,13 +210,13 @@ static void prv_window_load(Window *window) {
 }
 
 static void prv_window_unload(Window *window) {
+    layer_destroy(s_engine_layer);
     layer_destroy(s_text_layer);
 }
 
 void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-    /* signal to redraw the layers */
+    /* signal to redraw the layers, engine view will be marked dirty after time is updated */
     layer_mark_dirty(s_text_layer);
-    layer_mark_dirty(s_engine_layer);
 }
 
 static void prv_init(void) {
@@ -204,6 +231,9 @@ static void prv_init(void) {
     s_font = fonts_get_system_font(FONT_KEY_LECO_26_BOLD_NUMBERS_AM_PM);
 
     /* setup wrapper function pointers */
+    open_map_p = open_map;
+    read_map_p = read_map;
+    close_map_p = close_map;
     get_graphic_dim_p = get_graphic_dim;
     load_graphic_p = load_graphic;
     /* allocate texture memory */
@@ -211,7 +241,8 @@ static void prv_init(void) {
     if(texmem == NULL) {
         APP_LOG(APP_LOG_LEVEL_DEBUG, "Failed to allocate texture memory, probably going to crash.\n", s_window);
     }
-    engine_load();
+    /* initial map and view */
+    engine_load(0, 0);
 
     tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 }
@@ -222,8 +253,6 @@ static void prv_deinit(void) {
 
 int main(void) {
     prv_init();
-
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "Done initializing, pushed window: %p", s_window);
 
     app_event_loop();
     prv_deinit();

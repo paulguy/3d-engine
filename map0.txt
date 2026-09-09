@@ -1,18 +1,6 @@
 Texture as solid 0
 Texture as test_pattern 1
 
-Point as octagon -32 128
-Point 32 128
-Point 128 32
-Point 128 -32
-Point 32 -128
-Point -32 -128
-Point -128 -32
-Point -128 32
-
-Point as hallway1 -32 512
-Point 32 512
-
 point as player_start 0.0 0.0
 point as no_scroll 0.0 0.0
 
@@ -45,6 +33,15 @@ Matrix3x2 as northwest
 0.7 0.7 0.0
 0.0 0.0 1.0
 
+Point as octagon -32 128
+Point 32 128
+Point 128 32
+Point 128 -32
+Point 32 -128
+Point -32 -128
+Point -128 -32
+Point -128 32
+
 Line as octagon octagon
 test_pattern 000 no_scroll north
 test_pattern 000 no_scroll north
@@ -75,6 +72,9 @@ test_pattern 000 no_scroll floor
 test_pattern 000 no_scroll floor
 octagon 8
 
+Point as hallway1 -32 512
+Point 32 512
+
 Line as hallway1 hallway1
 test_pattern -111 no_scroll north
 test_pattern 000 no_scroll north
@@ -94,5 +94,28 @@ test_pattern -111 no_scroll floor
 hallway1 4
 
 link octagon octagon hallway1 hallway1+2
+
+point as warp 192 32
+point 192 -32
+
+Line as warp octagon+2
+solid 000 no_scroll north
+solid 000 no_scroll north
+Line warp
+solid 000 no_scroll north
+solid 000 no_scroll north
+Line warp+1
+solid 000 no_scroll north
+solid 000 no_scroll north
+Line octagon+3
+solid 000 no_scroll north
+solid 000 no_scroll north
+
+sector as warp 64 0
+solid 000 no_scroll floor
+solid 000 no_scroll floor
+warp 4 warp 1 0
+
+link octagon octagon+2 warp warp+3
 
 View octagon player_start 0.0 32.0 90.0

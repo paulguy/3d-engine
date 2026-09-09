@@ -39,7 +39,7 @@ int load_in_empty_slot(unsigned char number, unsigned char dim, unsigned char **
                 texslot[i].dim = LARGE_TEX_DIM;
                 texslot[i].l_number = number;
                 texslot[i].l_age = 0;
-                LOG("Loaded large texture %d.\n", number);
+                LOG("Loaded large texture %d.\n", number - 1);
                 return(0);
             }
         }
@@ -55,7 +55,7 @@ int load_in_empty_slot(unsigned char number, unsigned char dim, unsigned char **
                         *data = &(texmem[i * LARGE_TEX_SIZE + (j * SMALL_TEX_SIZE)]);
                         texslot[i].s_number[j] = number;
                         texslot[i].s_age[j] = 0;
-                        LOG("Loaded small texture %d.\n", number);
+                        LOG("Loaded small texture %d.\n", number - 1);
                         return(0);
                     }
                 }
@@ -75,7 +75,7 @@ int load_in_empty_slot(unsigned char number, unsigned char dim, unsigned char **
                 texslot[i].f_age = 0;
                 texslot[i].s_number[0] = number;
                 texslot[i].s_age[0] = 0;
-                LOG("Loaded small texture %d.\n", number);
+                LOG("Loaded small texture %d.\n", number - 1);
                 return(0);
             }
         }
@@ -215,7 +215,7 @@ int load_tex(unsigned char number, unsigned char **data) {
     /* get graphic dim to not have to repeat lookup later */
     dim = get_graphic_dim_p(number - 1);
     if(dim == 0) {
-        LOG("Texture %d doesn't exist.\n", number);
+        LOG("Texture %d doesn't exist.\n", number - 1);
         return(0);
     } else if(dim != SMALL_TEX_DIM && dim != LARGE_TEX_DIM) {
         LOG("Texture dimensions must be either %dpx or %dpx!\n", SMALL_TEX_DIM, LARGE_TEX_DIM);
@@ -228,7 +228,7 @@ int load_tex(unsigned char number, unsigned char **data) {
         found = free_slot(dim);
         if(dim == SMALL_TEX_DIM) {
             if(load_graphic_p(number - 1, &(texmem[found * SMALL_TEX_SIZE])) != 0) {
-                LOG("Failed to load texture %d\n", number);
+                LOG("Failed to load texture %d\n", number - 1);
                 return(0);
             }
             texslot[found / 4].s_number[found % 4] = number;
@@ -236,7 +236,7 @@ int load_tex(unsigned char number, unsigned char **data) {
             *data = &(texmem[found * SMALL_TEX_SIZE]);
         } else { /* LARGE_TEX_DIM */
             if(load_graphic_p(number - 1, &(texmem[found * LARGE_TEX_SIZE])) != 0) {
-                LOG("Failed to load texture %d\n", number);
+                LOG("Failed to load texture %d\n", number - 1);
                 return(0);
             }
             texslot[found].l_number = number + 1;
