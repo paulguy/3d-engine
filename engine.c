@@ -90,20 +90,12 @@
 #include "log.h"
 #include "cache.h"
 
+#define CEILING (0)
+#define FLOOR (1)
+
 #define ACTION_NONE (0x00)
 #define ACTION_WARP (0x01)
 #define ACTION_WAYPOINT (0x02)
-
-typedef enum {
-    AXIS_PX,
-    AXIS_PY,
-    AXIS_NX,
-    AXIS_NY
-} Axis;
-
-/*
- * loading zones
- */
 
 unsigned char mapnum;
 View v;
@@ -214,19 +206,19 @@ static void print_data(Header *h) {
     for(i = 0; i < h->lines; i++) {
         LOG("%d Line %p %p %p %hu %hu %hu %hu %p %p %p %p\n", i,
             &(*l)[i], (*l)[i].point, (*l)[i].sector,
-            (*l)[i].texture[0], (*l)[i].texture[1],
-            (*l)[i].shade[0], (*l)[i].shade[1],
-            (*l)[i].texture_bias[0], (*l)[i].texture_bias[1],
-            (*l)[i].texture_transform[0], (*l)[i].texture_transform[1]);
+            (*l)[i].texture[CEILING], (*l)[i].texture[FLOOR],
+            (*l)[i].shade[CEILING], (*l)[i].shade[FLOOR],
+            (*l)[i].texture_bias[CEILING], (*l)[i].texture_bias[FLOOR],
+            (*l)[i].texture_transform[CEILING], (*l)[i].texture_transform[FLOOR]);
     }
 
     for(i = 0; i < h->sectors; i++) {
         LOG("%d Sector %p %f %f %hu %hu %hu %hu %p %p %p %p %p %hhu ", i,
-            &(*s)[i], (*s)[i].height[0], (*s)[i].height[1],
-            (*s)[i].texture[0], (*s)[i].texture[1],
-            (*s)[i].shade[0], (*s)[i].shade[1],
-            (*s)[i].texture_bias[0], (*s)[i].texture_bias[1],
-            (*s)[i].texture_transform[0], (*s)[i].texture_transform[1],
+            &(*s)[i], (*s)[i].height[CEILING], (*s)[i].height[FLOOR],
+            (*s)[i].texture[CEILING], (*s)[i].texture[FLOOR],
+            (*s)[i].shade[CEILING], (*s)[i].shade[FLOOR],
+            (*s)[i].texture_bias[CEILING], (*s)[i].texture_bias[FLOOR],
+            (*s)[i].texture_transform[CEILING], (*s)[i].texture_transform[FLOOR],
             (*s)[i].firstline, (*s)[i].lines);
         switch((*s)[i].action & 0xFF) {
             case ACTION_NONE:
@@ -254,10 +246,10 @@ void apply_view_data(View_data *vd) {
     v.pos.y = (*p)[vd->pos].y;
     v.angle = vd->angle;
     v.startheight = vd->startheight;
-    v.fov = vd->fov / 360.0 * M_PI * 2.0;
+    v.fov = vd->fov;
 
     /* set the player's world height */
-    v.height = v.start->height[1] + v.startheight;
+    v.height = v.start->height[FLOOR] + v.startheight;
 }
 
 int engine_load(unsigned char number, unsigned char view) {
@@ -350,30 +342,30 @@ int engine_load(unsigned char number, unsigned char view) {
         (*l)[i].point = &(*p)[d.l.point];
         /* sector will be filled when links are read */
         (*l)[i].sector = NULL;
-        (*l)[i].texture[0] = d.l.texture[0];
-        (*l)[i].texture[1] = d.l.texture[1];
-        (*l)[i].shade[0] = d.l.shade[0];
-        (*l)[i].shade[1] = d.l.shade[1];
-        (*l)[i].texture_bias[0] = &(*p)[d.l.texture_bias[0]];
-        (*l)[i].texture_bias[1] = &(*p)[d.l.texture_bias[1]];
-        (*l)[i].texture_transform[0] = &(*m32)[d.l.texture_transform[0]];
-        (*l)[i].texture_transform[1] = &(*m32)[d.l.texture_transform[1]];
+        (*l)[i].texture[CEILING] = d.l.texture[CEILING];
+        (*l)[i].texture[FLOOR] = d.l.texture[FLOOR];
+        (*l)[i].shade[CEILING] = d.l.shade[CEILING];
+        (*l)[i].shade[FLOOR] = d.l.shade[FLOOR];
+        (*l)[i].texture_bias[CEILING] = &(*p)[d.l.texture_bias[CEILING]];
+        (*l)[i].texture_bias[FLOOR] = &(*p)[d.l.texture_bias[FLOOR]];
+        (*l)[i].texture_transform[CEILING] = &(*m32)[d.l.texture_transform[CEILING]];
+        (*l)[i].texture_transform[FLOOR] = &(*m32)[d.l.texture_transform[FLOOR]];
     }
 
     start += sizeof(Line_data) * h.lines;
     for(i = 0; i < h.sectors; i++) {
         read_map_p(start + (i * sizeof(Sector_data)), sizeof(Sector_data), &d.s);
         d.s.lines += 3; /* 3 lines minimum so 0 is 3 mines */
-        (*s)[i].height[0] = d.s.height[0];
-        (*s)[i].height[1] = d.s.height[1];
-        (*s)[i].texture[0] = d.s.texture[0];
-        (*s)[i].texture[1] = d.s.texture[1];
-        (*s)[i].shade[0] = d.s.shade[0];
-        (*s)[i].shade[1] = d.s.shade[1];
-        (*s)[i].texture_bias[0] = &(*p)[d.s.texture_bias[0]];
-        (*s)[i].texture_bias[1] = &(*p)[d.s.texture_bias[1]];
-        (*s)[i].texture_transform[0] = &(*m22)[d.s.texture_transform[0]];
-        (*s)[i].texture_transform[1] = &(*m22)[d.s.texture_transform[1]];
+        (*s)[i].height[CEILING] = d.s.height[CEILING];
+        (*s)[i].height[FLOOR] = d.s.height[FLOOR];
+        (*s)[i].texture[CEILING] = d.s.texture[CEILING];
+        (*s)[i].texture[FLOOR] = d.s.texture[FLOOR];
+        (*s)[i].shade[CEILING] = d.s.shade[CEILING];
+        (*s)[i].shade[FLOOR] = d.s.shade[FLOOR];
+        (*s)[i].texture_bias[CEILING] = &(*p)[d.s.texture_bias[CEILING]];
+        (*s)[i].texture_bias[FLOOR] = &(*p)[d.s.texture_bias[FLOOR]];
+        (*s)[i].texture_transform[CEILING] = &(*m22)[d.s.texture_transform[CEILING]];
+        (*s)[i].texture_transform[FLOOR] = &(*m22)[d.s.texture_transform[FLOOR]];
         (*s)[i].firstline = &(*l)[d.s.firstline];
         (*s)[i].lines = d.s.lines;
         (*s)[i].action = d.s.action;
@@ -422,37 +414,13 @@ error:
     return(-1);
 }
 
-Axis find_slope(float angle, float *slope) {
-    /* find rise and run of a ray firing from the view such that each unit of slope 
-     * given any offset plots a line perpendicular to the view center angle */
-
-    /* avoid division by 0 ... things might still get weird at angles extremely close to the axis
-     * so i might still need to return to the -45,+45 degree off axis ranges or return the 
-     * slope as a vector and do the transformation in line_hit */
-    if(angle >= (M_PI * 2.0 / 8.0) && angle < (M_PI * 2.0 * 3.0 / 8.0)) {
-        /* right +x */
-        *slope = cos(angle) / sin(angle);
-        return(AXIS_PX);
-    } else if(angle >= (M_PI * 2.0 * 3.0 / 8.0) && angle < (M_PI * 2.0 * 5.0 / 8.0)) {
-        /* down -y */
-        *slope = sin(angle) / cos(angle);
-        return(AXIS_NY);
-    } else if(angle >= (M_PI * 2.0 * 5.0 / 8.0) && angle < (M_PI * 2.0 * 7.0 / 8.0)) {
-        /* left -x */
-        *slope = cos(angle) / sin(angle);
-        return(AXIS_NX);
-    }
-    /* up +y */
-    *slope = sin(angle) / cos(angle);
-    return(AXIS_PY);
-}
-
 int line_hit(Point *p1, Point *p2,
-             Point *pos, Axis axis, float slope,
+             Point *pos, Point *slope,
+             int vvertical, float vslope,
              Point *hit) {
     float x, y;
     float lslope;
-    /* view is given as a general axis facing direction and a slope representing the line
+    /* view is determined as a general axis facing direction and a slope representing the line
      * firing out from the view position out of a range of 1/4 pi from both directions
      * of the axis.
      *
@@ -473,58 +441,17 @@ int line_hit(Point *p1, Point *p2,
      * x = (-(lslope * p1->x) + (slope * pos->x) + p1->y - pos->y) / (slope - lslope)
     */
 
-    if(axis == AXIS_NX || axis == AXIS_PX) {
-        /* view ray about X axis */
-
-        if(p2->x == p1->x) {
-            /* vertical line slope can't be calculated */
-
-            /* X is just the line */
-            x = p1->x;
-        } else {
-            /* calculate line slope */
-            lslope = (p2->y - p1->y) / (p2->x - p1->x);
-
-            /* calculate line intercept X */
-            x = (-(lslope * p1->x) + (slope * pos->x) + p1->y - pos->y) / (slope - lslope);
-
-            /* if intercept is outside of the line's bounds, it's not eligible */
-            if(!((x >= p1->x && x <= p2->x) ||
-                 (x >= p2->x && x <= p1->x))) {
-                return(0);
-            }
-        }
-
-        /* calculate Y of X intercept from view ray */
-        if(p1->y == p2->y) {
-            y = p1->y;
-        } else {
-            y = (slope * x) + pos->y - (slope * pos->x);
-        }
-
-        if((axis == AXIS_PX && x >= pos->x && y <= p1->y && y >= p2->y) ||
-           (axis == AXIS_NX && x <= pos->x && y <= p2->y && y >= p1->y)) {
-            /* X intercept is between line points and in front of view as sector lines are clockwise */
-
-            /* pythagorean theorem solving for hypotenuse */
-            hit->x = x;
-            hit->y = y;
-            return(1);
-        }
-    } else {
+    if(vvertical) {
         /* view ray about Y axis */
-
-        if(p2->y == p1->y) {
-            /* horizontal line slope can't be calculated */
-
-            /* Y is just the line */
+        if(p1->y == p2->y) {
+            /* horizontal line, Y is Y */
             y = p1->y;
         } else {
             /* calculate line slope */
             lslope = (p2->x - p1->x) / (p2->y - p1->y);
 
-            /* calculate line intercept Y */
-            y = (-(lslope * p1->y) + (slope * pos->y) + p1->x - pos->x) / (slope - lslope);
+            /* find Y intersection */
+            y = (-(lslope * p1->y) + (vslope * pos->y) + p1->x - pos->x) / (vslope - lslope);
 
             /* if intercept is outside of the line's bounds, it's not eligible */
             if(!((y >= p1->y && y <= p2->y) ||
@@ -533,30 +460,67 @@ int line_hit(Point *p1, Point *p2,
             }
         }
 
-        /* calculate X of Y intercept */
+        /* calculate X */
         if(p1->x == p2->x) {
             x = p1->x;
         } else {
-            x = (slope * y) + pos->x - (slope * pos->y);
+            x = (vslope * y) + pos->x - (vslope * pos->y);
         }
 
-        if((axis == AXIS_PY && y >= pos->y && x >= p1->x && x <= p2->x) ||
-           (axis == AXIS_NY && y <= pos->y && x >= p2->x && x <= p1->x)) {
-            /* X intercept is between line points and in front of view as sector lines are clockwise */
+        if(((x >= p1->x && x <= p2->x) ||
+            (x >= p2->x && x <= p1->x)) &&
+           ((slope->y > 0.0 && y >= pos->y) ||
+            (slope->y < 0.0 && y <= pos->y))) {
+            /* X intercept is between line points and in front of view */
+            hit->x = x;
+            hit->y = y;
+            return(1);
+        }
+    } else {
+        /* view ray about X axis */
+        if(p1->x == p2->x) {
+            /* vertical line, X is just X */
+            x = p1->x;
+        } else {
+            /* calculate line slope */
+            lslope = (p2->y - p1->y) / (p2->x - p1->x);
 
-            /* pythagorean theorem solving for hypotenuse */
+            /* find X intersection */
+            x = (-(lslope * p1->x) + (vslope * pos->x) + p1->y - pos->y) / (vslope - lslope);
+
+            /* if intercept is outside of the line's bounds, it's not eligible */
+            if(!((x >= p1->x && x <= p2->x) ||
+                 (x >= p2->x && x <= p1->x))) {
+                return(0);
+            }
+        }
+ 
+        /* calculate Y */
+        if(p1->y == p2->y) {
+            y = p1->y;
+        } else {
+            y = (vslope * x) + pos->y - (vslope * pos->x);
+        }
+
+        if(((y <= p1->y && y >= p2->y) ||
+            (y <= p2->y && y >= p1->y)) &&
+           ((slope->x > 0.0 && x >= pos->x) ||
+            (slope->x < 0.0 && x <= pos->x))) {
+            /* X intercept is between line points and in front of view */
             hit->x = x;
             hit->y = y;
             return(1);
         }
     }
 
+    /* missed */
+
     return(0);
 }
-
-Line *scan_sector(Sector *s,
-                  Point *pos, int axis, float slope,
-                  Sector *last_s,
+ 
+Line *scan_sector(Sector *last_s, Sector *s,
+                  Point *pos, Point *slope,
+                  int vvertical, float vslope,
                   Point *hit) {
     Point *point;
     Point *nextpoint;
@@ -578,7 +542,8 @@ Line *scan_sector(Sector *s,
         }
 
         if(line_hit(point, nextpoint,
-                    pos, axis, slope,
+                    pos, slope,
+                    vvertical, vslope,
                     hit)) {
             return line;
         }
@@ -591,6 +556,14 @@ Line *scan_sector(Sector *s,
 
 float get_distance(Point *pos, Point *hit) {
     return(sqrtf(fabs(powf(hit->y - pos->y, 2.0)) + fabs(powf(hit->x - pos->x, 2.0))));
+}
+
+float get_distance2(Point *pos, Point *hit, Point *slope) {
+    if(fabs(slope->x) > fabs(slope->y)) {
+        return(fabs((pos->x - hit->x) / slope->x));
+    }
+
+    return(fabs((pos->y - hit->y) / slope->y));
 }
 
 void set_tex(unsigned char num,
@@ -609,13 +582,12 @@ void set_tex(unsigned char num,
 
 void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     Sector *s, *last_s;
-    float angle;
-    int axis;
-    float slope;
+    float offset;
+    Point slope;
+    int vvertical;
+    float vslope;
     Line *line;
     Point hit;
-    float distance;
-    float accumulated_distance;
     float total_distance;
     int x, y;
     float z;
@@ -623,7 +595,6 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     int tx, ty;
     int top, bottom;
     Point pos;
-    float compensation;
     float ceilingdiff;
     float floordiff;
     float next_y;
@@ -648,34 +619,43 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     Matrix2x2 *texture_transform_22;
     Matrix3x2 *texture_transform_32;
 
+    float w_2 = (float)w / 2.0;
     float h_2 = (float)h / 2.0;
     float fov_2 = v.fov / 2.0;
-    float step = v.fov / (float)w;
     float y_to_angle = fov_2 / h_2;
     float angle_to_y = h_2 / fov_2;
+    float sin_angle = sin(v.angle);
+    float cos_angle = cos(v.angle);
 
     age_slots();
 
     /* for each column */
     for(x = 0; x < w; x++) {
-        angle = fmodf(v.angle + (step * (x - h_2)), M_PI * 2.0);
-        if(angle < 0.0) {
-            angle += M_PI * 2.0;
+        /* TODO: calculate based on FOV */
+        offset = (x / w_2) - 1.0;
+        slope.x = sin_angle + (cos_angle * offset);
+        slope.y = cos_angle - (sin_angle * offset);
+
+        if(fabs(slope.y) > fabs(slope.x)) {
+            /* view ray about Y axis */
+            vvertical = 1;
+            vslope = slope.x / slope.y;
+        } else {
+            /* view ray about X axis */
+            vvertical = 0;
+            vslope = slope.y / slope.x;
         }
-
-        axis = find_slope(angle, &slope);
-
+ 
         s = v.start;
         last_s = NULL;
         top = 0;
         bottom = h - 1;
         pos.x = v.pos.x;
         pos.y = v.pos.y;
-        accumulated_distance = 0.0;
+        total_distance = 0.0;
         while (true) {
-            line = scan_sector(s,
-                               &pos, axis, slope,
-                               last_s,
+            line = scan_sector(last_s, s, &pos,
+                               &slope, vvertical, vslope,
                                &hit);
 
             /* shouldn't happen, but in case the ray misses for some reason */
@@ -684,13 +664,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             }
 
             /* get the distance between the view and hit coordinates */
-            distance = get_distance(&pos, &hit);
-            accumulated_distance += distance;
+            total_distance += get_distance2(&pos, &hit, &slope);
 
-            /* fisheye compensation, this kinda doesn't work 100% but whatever? */
-            compensation = cos(-fov_2 + (step * (float)x));
-
-            total_distance = accumulated_distance * compensation;
             /* iterate y (angle transformed with FOV to get an angle from screen Y) with height
              * from bottom solving for distance until total distance is reached.
              * Texture X and Y lookup from offset from view given ray angle */
@@ -698,25 +673,26 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             /* draw ceiling */
             ceilingdiff = s->height[0] - v.height;
             if(ceilingdiff > 0.0) {
-                /* get sector textures */
-                if(s->texture[0] != ceiling_tex) {
-                    ceiling_tex = s->texture[0];
+                /* ceiling is above the view line */
+
+                /* get ceiling texture */
+                if(s->texture[CEILING] != ceiling_tex) {
+                    ceiling_tex = s->texture[CEILING];
                     set_tex(ceiling_tex, &ceiling_data, &ceiling_mask, &ceiling_dim);
                 }
  
-                texture_bias = s->texture_bias[0];
-                texture_transform_22 = s->texture_transform[0];
+                texture_bias = s->texture_bias[CEILING];
+                texture_transform_22 = s->texture_transform[CEILING];
                 for(y = top; y < h; y++) {
                     z = ceilingdiff / tanf((h_2 - y) * y_to_angle);
                     if(z >= total_distance) {
                         break;
                     }
-                    z /= compensation;
                     if(ceiling_dim == 0) {
                         color = 0x00;
                     } else {
-                        wx = v.pos.x + (sin(angle) * z);
-                        wy = v.pos.y + (cos(angle) * z);
+                        wx = v.pos.x + (slope.x * z);
+                        wy = v.pos.y + (slope.y * z);
                         tx = (wx * texture_transform_22->xx) +
                              (wy * texture_transform_22->xy) +
                              texture_bias->x;
@@ -725,14 +701,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                              texture_bias->y;
                         color = ceiling_data[(ty & ceiling_mask) << ceiling_dim | (tx & ceiling_mask)];
                     }
-                    if(s->shade[0] & 0xFF00) {
+                    if(s->shade[CEILING] & 0xFF00) {
                         color = ~color; /* invert bits */
                         color &= 0xDB; /* unset overflow bits */
-                        color += s->shade[0] & 0xFF; /* add which should subtract when inverted back? */
+                        color += s->shade[CEILING] & 0xFF; /* add which should subtract when inverted back? */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                         color = ~color; /* invert back */
                     } else {
-                        color += s->shade[0]; /* add */
+                        color += s->shade[CEILING]; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
@@ -741,26 +717,25 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             }
 
             /* draw floor */
-            floordiff = s->height[1] - v.height;
+            floordiff = s->height[FLOOR] - v.height;
             if(floordiff < 0.0) {
-                if(s->texture[1] != floor_tex) {
-                    floor_tex = s->texture[1];
+                if(s->texture[FLOOR] != floor_tex) {
+                    floor_tex = s->texture[FLOOR];
                     set_tex(floor_tex, &floor_data, &floor_mask, &floor_dim);
                 }
 
-                texture_bias = s->texture_bias[1];
-                texture_transform_22 = s->texture_transform[1];
+                texture_bias = s->texture_bias[FLOOR];
+                texture_transform_22 = s->texture_transform[FLOOR];
                 for(y = bottom; y >= 0; y--) {
                     z = -floordiff / tanf((y - h_2) * y_to_angle);
                     if(z >= total_distance) {
                         break;
                     }
-                    z /= compensation;
                     if(floor_dim == 0) {
                         color = 0x00;
                     } else {
-                        wx = v.pos.x + (sin(angle) * z);
-                        wy = v.pos.y + (cos(angle) * z);
+                        wx = v.pos.x + (slope.x * z);
+                        wy = v.pos.y + (slope.y * z);
                         tx = (wx * texture_transform_22->xx) +
                              (wy * texture_transform_22->xy) +
                              texture_bias->x;
@@ -769,14 +744,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                              texture_bias->y;
                         color = floor_data[(ty & floor_mask) << floor_dim | (tx & floor_mask)];
                     }
-                    if(s->shade[1] & 0xFF00) {
+                    if(s->shade[FLOOR] & 0xFF00) {
                         color = ~color; /* invert bits */
                         color &= 0xDB; /* unset overflow bits */
-                        color += s->shade[1] & 0xFF; /* add which should subtract when inverted back? */
+                        color += s->shade[FLOOR] & 0xFF; /* add which should subtract when inverted back? */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                         color = ~color; /* invert back */
                     } else {
-                        color += s->shade[1]; /* add */
+                        color += s->shade[FLOOR]; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
@@ -785,8 +760,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             }
 
             /* get top wall texture as this'll most likely be needed */
-            if(line->texture[0] != top_line_tex) {
-                top_line_tex = line->texture[0];
+            if(line->texture[CEILING] != top_line_tex) {
+                top_line_tex = line->texture[CEILING];
                 set_tex(top_line_tex, &top_line_data, &top_line_mask, &top_line_dim);
             }
 
@@ -794,10 +769,10 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 /* solid wall, no sector on the other side */
     
                 /* draw wall */
-                wx = v.pos.x + (sin(angle) * total_distance);
-                wy = v.pos.y + (cos(angle) * total_distance);
-                texture_bias = line->texture_bias[0];
-                texture_transform_32 = line->texture_transform[0];
+                wx = v.pos.x + (slope.x * total_distance);
+                wy = v.pos.y + (slope.y * total_distance);
+                texture_bias = line->texture_bias[CEILING];
+                texture_transform_32 = line->texture_transform[CEILING];
                 for(y = top;
                     y <= bottom && y < h;
                     y++) {
@@ -815,14 +790,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                              texture_bias->y;
                         color = top_line_data[(ty & top_line_mask) << top_line_dim | (tx & top_line_mask)];
                     }
-                    if(line->shade[0] & 0xFF00) {
+                    if(line->shade[CEILING] & 0xFF00) {
                         color = ~color; /* invert bits */
                         color &= 0xDB; /* unset overflow bits */
-                        color += line->shade[0] & 0xFF; /* add which should subtract when inverted back? */
+                        color += line->shade[CEILING] & 0xFF; /* add which should subtract when inverted back? */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                         color = ~color; /* invert back */
                     } else {
-                        color += line->shade[0]; /* add */
+                        color += line->shade[CEILING]; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
@@ -833,8 +808,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             s = line->sector;
 
             /* draw top wall */
-            wx = v.pos.x + (sin(angle) * total_distance);
-            wy = v.pos.y + (cos(angle) * total_distance);
+            wx = v.pos.x + (sin(v.angle + offset) * total_distance);
+            wy = v.pos.y + (cos(v.angle + offset) * total_distance);
             ceilingdiff = s->height[0] - v.height;
             next_y = atan2f(total_distance, ceilingdiff) * angle_to_y - h_2;
             texture_bias = line->texture_bias[0];
@@ -856,14 +831,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                          texture_bias->y;
                     color = top_line_data[(ty & top_line_mask) << top_line_dim | (tx & top_line_mask)];
                 }
-                if(line->shade[0] & 0xFF00) {
+                if(line->shade[CEILING] & 0xFF00) {
                     color = ~color; /* invert bits */
                     color &= 0xDB; /* unset overflow bits */
-                    color += line->shade[0] & 0xFF; /* add which should subtract when inverted back? */
+                    color += line->shade[CEILING] & 0xFF; /* add which should subtract when inverted back? */
                     color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     color = ~color; /* invert back */
                 } else {
-                    color += line->shade[0]; /* add */
+                    color += line->shade[CEILING]; /* add */
                     color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                 }
                 pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
@@ -871,19 +846,19 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             top = y;
 
             /* draw bottom wall */
-            wx = v.pos.x + (sin(angle) * total_distance);
-            wy = v.pos.y + (cos(angle) * total_distance);
-            floordiff = s->height[1] - v.height;
+            wx = v.pos.x + (sin(v.angle + offset) * total_distance);
+            wy = v.pos.y + (cos(v.angle + offset) * total_distance);
+            floordiff = s->height[FLOOR] - v.height;
             next_y = atan2f(total_distance, floordiff) * angle_to_y - h_2;
             if(next_y < bottom) {
                 /* bottom wall texture will be needed */
-                if(line->texture[1] != bottom_line_tex) {
-                    bottom_line_tex = line->texture[1];
+                if(line->texture[FLOOR] != bottom_line_tex) {
+                    bottom_line_tex = line->texture[FLOOR];
                     set_tex(bottom_line_tex, &bottom_line_data, &bottom_line_mask, &bottom_line_dim);
                 }
 
-                texture_bias = line->texture_bias[1];
-                texture_transform_32 = line->texture_transform[1];
+                texture_bias = line->texture_bias[FLOOR];
+                texture_transform_32 = line->texture_transform[FLOOR];
             }
             for(y = bottom;
                 y >= next_y && y >= 0;
@@ -902,14 +877,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                          texture_bias->y;
                     color = bottom_line_data[(ty & bottom_line_mask) << bottom_line_dim | (tx & bottom_line_mask)];
                 }
-                if(line->shade[1] & 0xFF00) {
+                if(line->shade[FLOOR] & 0xFF00) {
                     color = ~color; /* invert bits */
                     color &= 0xDB; /* unset overflow bits */
-                    color += line->shade[1] & 0xFF; /* add which should subtract when inverted back? */
+                    color += line->shade[FLOOR] & 0xFF; /* add which should subtract when inverted back? */
                     color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     color = ~color; /* invert back */
                 } else {
-                    color += line->shade[1]; /* add */
+                    color += line->shade[FLOOR]; /* add */
                     color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                 }
                 pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
@@ -928,7 +903,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
 }
 
 int do_action(Sector *s) {
-    switch(s->action) {
+    switch(s->action & 0xFF) {
         case ACTION_WARP:
             unsigned char map = (s->action & 0xFF00) >> 8;
             unsigned char view = (s->action & 0xFF0000) >> 16;
@@ -948,7 +923,8 @@ int do_action(Sector *s) {
                     return(0);
                 }
 
-                start = (h.points * sizeof(Point_data)) +
+                start = sizeof(Header) +
+                        (h.points * sizeof(Point_data)) +
                         (h.matrix2x2s * sizeof(Matrix2x2_data)) +
                         (h.matrix3x2s * sizeof(Matrix3x2_data)) +
                         (h.lines * sizeof(Line_data)) +
@@ -979,42 +955,35 @@ int do_action(Sector *s) {
 }
 
 void engine_move(float x, float y) {
-    Axis axis;
-    float slope;
+    Point slope;
+    int vvertical;
+    float vslope;
     Point pos;
     Point hit;
     Line *line;
     Sector *s;
     Sector *last_s;
-    float diffx, diffy;
-    diffx = x - v.pos.x;
-    diffy = y - v.pos.y;
 
-    /* similar to line_hit but rather than a view ray off in to "infinity", a line segment from current position and the difference position */
-    if(fabs(diffx) > fabs(diffy)) {
-        if(diffx > 0.0) {
-            axis = AXIS_PX;
-        } else {
-            axis = AXIS_NX;
-        }
-        slope = diffy / diffx;
+    slope.x = sin(v.angle);
+    slope.y = cos(v.angle);
+
+    if(fabs(slope.y) > fabs(slope.x)) {
+        /* view ray about Y axis */
+        vvertical = 1;
+        vslope = slope.x / slope.y;
     } else {
-        if(diffy > 0.0) {
-            axis = AXIS_PY;
-        } else {
-            axis = AXIS_NY;
-        }
-        slope = diffx / diffy;
+        /* view ray about X axis */
+        vvertical = 0;
+        vslope = slope.y / slope.x;
     }
-
+ 
     pos.x = v.pos.x;
     pos.y = v.pos.y;
     last_s = NULL;
     s = v.start;
     while(true) {
-        line = scan_sector(s,
-                           &pos, axis, slope,
-                           last_s,
+        line = scan_sector(last_s, s, &pos,
+                           &slope, vvertical, vslope,
                            &hit);
 
         /* shouldn't happen, but in case the ray misses for some reason */
@@ -1024,14 +993,18 @@ void engine_move(float x, float y) {
 
         /* check if the hit is further than traveled, if it is, a new sector won't be reached, so stop,
          * otherwise, continue to iterate */
-        if(axis == AXIS_PX && hit.x > x) {
-            break;
-        } else if(axis == AXIS_NX && hit.x < x) {
-            break;
-        } else if(axis == AXIS_PY && hit.y > y) {
-            break;
-        } else if(axis == AXIS_NY && hit.y < y) {
-            break;
+        if(fabs(slope.x) > fabs(slope.y)) {
+            if(slope.x > 0.0 && hit.x > x) {
+                break;
+            } else if(slope.x < 0.0 && hit.x < x) {
+                break;
+            }
+        } else {
+            if(slope.y > 0.0 && hit.y > y) {
+                break;
+            } else if(slope.y < 0.0 && hit.y < y) {
+                break;
+            }
         }
 
         /* if wall collided, don't continue to move
