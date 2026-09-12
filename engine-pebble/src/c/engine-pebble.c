@@ -48,12 +48,15 @@ static Layer *s_engine_layer;
 static ResHandle map;
 
 const unsigned char TEX_IDS[] = {
-    RESOURCE_ID_TEX_0
+    RESOURCE_ID_TEX_0,
+    RESOURCE_ID_TEX_1,
+    RESOURCE_ID_TEX_2
 };
 #define MAX_TEX_ID (sizeof(TEX_IDS) - 1)
 
 const unsigned char MAP_IDS[] = {
-    RESOURCE_ID_MAP_0
+    RESOURCE_ID_MAP_0,
+    RESOURCE_ID_MAP_1
 };
 #define MAX_MAP_ID (sizeof(MAP_IDS) - 1)
 

@@ -19,14 +19,29 @@
         "resources": {
             "media": [
                 {
-                  "name": "TEX_0",
-                  "file": "tex0.bin",
-                  "type": "raw"
+                    "name": "TEX_0",
+                    "file": "tex0.bin",
+                    "type": "raw"
                 },
                 {
-                  "name": "MAP_0",
-                  "file": "map0.bin",
-                  "type": "raw"
+                    "name": "TEX_1",
+                    "file": "tex1.bin",
+                    "type": "raw"
+                },
+                {
+                    "name": "TEX_2",
+                    "file": "tex2.bin",
+                    "type": "raw"
+                },
+                {
+                    "name": "MAP_0",
+                    "file": "map0.bin",
+                    "type": "raw"
+                },
+                {
+                    "name": "MAP_1",
+                    "file": "map1.bin",
+                    "type": "raw"
                 }
             ]
         }

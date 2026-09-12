@@ -1,0 +1,57 @@
+Texture as solid 0
+Texture as test_pattern 1
+Texture as ugly_carpet 2
+Texture as ugly_wallpaper 3
+
+point as no_scroll 0.0 0.0
+
+Matrix2x2 as floor
+1.0 0.0
+0.0 1.0
+
+Matrix3x2 as north
+1.0 0.0 0.0
+0.0 0.0 1.0
+Matrix3x2 as northeast
+0.7 -0.7 0.0
+0.0 0.0 1.0
+Matrix3x2 as east
+0.0 -1.0 0.0
+0.0 0.0 1.0
+Matrix3x2 as southeast
+-0.7 -0.7 0.0
+0.0 0.0 1.0
+Matrix3x2 as south
+-1.0 0.0 0.0
+0.0 0.0 1.0
+Matrix3x2 as southwest
+-0.7 0.7 0.0
+0.0 0.0 1.0
+Matrix3x2 as west
+0.0 1.0 0.0
+0.0 0.0 1.0
+Matrix3x2 as northwest
+0.7 0.7 0.0
+0.0 0.0 1.0
+
+point as room 0.0 64.0
+point 64.0 -64.0
+point -64.0 -64.0
+
+Line as room room
+ugly_wallpaper 000 no_scroll north
+ugly_wallpaper 000 no_scroll north
+Line room+1
+ugly_wallpaper 000 no_scroll north
+ugly_wallpaper 000 no_scroll north
+Line room+2
+ugly_wallpaper 000 no_scroll north
+ugly_wallpaper 000 no_scroll north
+
+Sector as room 64 0
+ugly_carpet -001 no_scroll floor
+ugly_carpet -001 no_scroll floor
+room 3
+
+point as player_start 0.0 0.0
+View room player_start 0.0 32.0 90.0
