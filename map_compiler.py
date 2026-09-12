@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 import struct
 import pathlib
+import math
 
 linenum : int = 0
 
@@ -423,7 +424,6 @@ class Sector:
         linecount : int
         action : int
 
-        linenum : int
         line : Line
         sector : Sector
 
@@ -443,6 +443,8 @@ class Sector:
         linecount, token = get_single(int, tokens, token, "line count")
         if linecount < 3:
             raise ValueError(f"{linenum}: A sector needs at least 3 lines, or up to 259.")
+        if line + linecount > len(Line.storage):
+            raise ValueError(f"{linenum}: Lines {line} - {line + linecount} goes past end of lines list ({len(Line.storage)}).")
 
         action, token = parse_action(tokens, token)
 
@@ -543,7 +545,9 @@ class View:
         return f"Sector {self.start}  Point {self.point}  Angle {self.angle}  Height {self.height}  Field of View {self.fov}"
 
     def serialize(self):
-        return View.STRUCT.pack(self.start, self.point, self.angle, self.height, self.fov)
+        return View.STRUCT.pack(self.start, self.point,
+                                self.angle / 360.0 * math.tau, self.height,
+                                self.fov / 360.0 * math.tau)
 
     @staticmethod
     def parse(tokens : list[str], token : int) -> tuple[Line, int]:
@@ -671,7 +675,12 @@ def main():
                         objtype.named[name] = obj
                     else:
                         # if it does have storage, store the index
-                        objtype.named[name] = index
+                        if not objtype.aliases is None:
+                            # if it has deduplication, store the alias
+                            # this is how it's fetched later so entered in indexes are transparent to the user
+                            objtype.named[name] = objtype.aliases.index(index)
+                        else:
+                            objtype.named[name] = index
                 else:
                     raise ValueError(f"{linenum}: Type {typename} can't be named.")
 
