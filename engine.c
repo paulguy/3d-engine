@@ -808,8 +808,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             s = line->sector;
 
             /* draw top wall */
-            wx = v.pos.x + (sin(v.angle + offset) * total_distance);
-            wy = v.pos.y + (cos(v.angle + offset) * total_distance);
+            wx = v.pos.x + (slope.x * total_distance);
+            wy = v.pos.y + (slope.y * total_distance);
             ceilingdiff = s->height[0] - v.height;
             next_y = atan2f(total_distance, ceilingdiff) * angle_to_y - h_2;
             texture_bias = line->texture_bias[0];
@@ -846,8 +846,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             top = y;
 
             /* draw bottom wall */
-            wx = v.pos.x + (sin(v.angle + offset) * total_distance);
-            wy = v.pos.y + (cos(v.angle + offset) * total_distance);
+            wx = v.pos.x + (slope.x * total_distance);
+            wy = v.pos.y + (slope.y * total_distance);
             floordiff = s->height[FLOOR] - v.height;
             next_y = atan2f(total_distance, floordiff) * angle_to_y - h_2;
             if(next_y < bottom) {
@@ -956,6 +956,7 @@ int do_action(Sector *s) {
 
 void engine_move(float x, float y) {
     Point slope;
+    Point dest;
     int vvertical;
     float vslope;
     Point pos;
@@ -964,19 +965,23 @@ void engine_move(float x, float y) {
     Sector *s;
     Sector *last_s;
 
-    slope.x = sin(v.angle);
-    slope.y = cos(v.angle);
-
-    if(fabs(slope.y) > fabs(slope.x)) {
-        /* view ray about Y axis */
+    /* calculate slope values, this doesn't need a planar projection, so just divide rise/run */
+    if(fabs(y) > fabs(x)) {
+        /* ray about Y axis */
         vvertical = 1;
-        vslope = slope.x / slope.y;
+        vslope = x / y;
     } else {
-        /* view ray about X axis */
+        /* ray about X axis */
         vvertical = 0;
-        vslope = slope.y / slope.x;
+        vslope = y / x;
     }
+    slope.x = x;
+    slope.y = y;
  
+    /* get destination */
+    dest.x = v.pos.x + x;
+    dest.y = v.pos.y + y;
+
     pos.x = v.pos.x;
     pos.y = v.pos.y;
     last_s = NULL;
@@ -988,21 +993,21 @@ void engine_move(float x, float y) {
 
         /* shouldn't happen, but in case the ray misses for some reason */
         if(line == NULL) {
-            break;
+            return;
         }
 
         /* check if the hit is further than traveled, if it is, a new sector won't be reached, so stop,
          * otherwise, continue to iterate */
         if(fabs(slope.x) > fabs(slope.y)) {
-            if(slope.x > 0.0 && hit.x > x) {
+            if(slope.x > 0.0 && hit.x >= dest.x) {
                 break;
-            } else if(slope.x < 0.0 && hit.x < x) {
+            } else if(slope.x < 0.0 && hit.x <= dest.x) {
                 break;
             }
         } else {
-            if(slope.y > 0.0 && hit.y > y) {
+            if(slope.y > 0.0 && hit.y >= dest.y) {
                 break;
-            } else if(slope.y < 0.0 && hit.y < y) {
+            } else if(slope.y < 0.0 && hit.y <= dest.y) {
                 break;
             }
         }
@@ -1014,20 +1019,21 @@ void engine_move(float x, float y) {
             return;
         }
 
+        /* update working position and sector */
         pos.x = hit.x;
         pos.y = hit.y;
         last_s = s;
         s = line->sector;
 
         if(do_action(s)) {
-            /* action updated state, so this state is stale and movement is stopped */
+            /* do_action indicated that it already updated the view state */
             return;
-        }
+        };
     }
 
     /* finally, update player position and sector */
-    v.pos.x = x;
-    v.pos.y = y;
+    v.pos.x = dest.x;
+    v.pos.y = dest.y;
     v.start = s;
     v.height = s->height[1] + v.startheight;
 }

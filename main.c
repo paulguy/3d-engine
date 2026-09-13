@@ -331,7 +331,7 @@ int main(int argc, char **argv) {
         }
 
         if(total_move.x != 0.0 || total_move.y != 0.0) {
-            engine_move(v.pos.x + total_move.x, v.pos.y + total_move.y);
+            engine_move(total_move.x, total_move.y);
             fprintf(stderr, "\r%f %f %f", v.pos.x, v.pos.y, v.angle);
             redraw = 1;
         }

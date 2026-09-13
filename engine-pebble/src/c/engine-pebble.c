@@ -174,7 +174,7 @@ static void text_layer_update(struct Layer *layer, GContext *ctx) {
 }
 
 void select_click_handler(ClickRecognizerRef recognizer, void *context) {
-    engine_move(v.pos.x + (sin(v.angle) * 10.0), v.pos.y + (cos(v.angle) * 10.0));
+    engine_move(sin(v.angle) * 10.0, cos(v.angle) * 10.0);
     layer_mark_dirty(s_engine_layer);
 }
 
