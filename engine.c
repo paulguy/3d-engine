@@ -683,7 +683,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
  
                 texture_bias = s->texture_bias[CEILING];
                 texture_transform_22 = s->texture_transform[CEILING];
-                for(y = top; y < h; y++) {
+                for(y = top; y < h && y < bottom; y++) {
                     z = ceilingdiff / tanf((h_2 - y) * y_to_angle);
                     if(z >= total_distance) {
                         break;
@@ -726,7 +726,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
 
                 texture_bias = s->texture_bias[FLOOR];
                 texture_transform_22 = s->texture_transform[FLOOR];
-                for(y = bottom; y >= 0; y--) {
+                for(y = bottom; y >= 0 && y >= top; y--) {
                     z = -floordiff / tanf((y - h_2) * y_to_angle);
                     if(z >= total_distance) {
                         break;

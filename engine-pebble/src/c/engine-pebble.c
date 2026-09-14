@@ -50,7 +50,8 @@ static ResHandle map;
 const unsigned char TEX_IDS[] = {
     RESOURCE_ID_TEX_0,
     RESOURCE_ID_TEX_1,
-    RESOURCE_ID_TEX_2
+    RESOURCE_ID_TEX_2,
+    RESOURCE_ID_TEX_3
 };
 #define MAX_TEX_ID (sizeof(TEX_IDS) - 1)
 

@@ -34,6 +34,11 @@
                     "type": "raw"
                 },
                 {
+                    "name": "TEX_3",
+                    "file": "tex3.bin",
+                    "type": "raw"
+                },
+                {
                     "name": "MAP_0",
                     "file": "map0.bin",
                     "type": "raw"

@@ -1,5 +1,8 @@
 Texture as solid 0
-Texture as test_pattern 1
+Texture as clouds 1
+Texture as carpet 2
+texture as wallpaper 3
+texture as ceiling 4
 
 point as no_scroll 0.0 0.0
 
@@ -10,138 +13,373 @@ Matrix2x2 as floor
 Matrix3x2 as north
 1.0 0.0 0.0
 0.0 0.0 1.0
+Matrix3x2 as north_075
+1.0 0.0 0.0
+0.0 0.0 0.75
 Matrix3x2 as northeast
 0.7 -0.7 0.0
 0.0 0.0 1.0
 Matrix3x2 as east
 0.0 -1.0 0.0
 0.0 0.0 1.0
+Matrix3x2 as east_075
+0.0 -1.0 0.0
+0.0 0.0 0.75
 Matrix3x2 as southeast
 -0.7 -0.7 0.0
 0.0 0.0 1.0
 Matrix3x2 as south
 -1.0 0.0 0.0
 0.0 0.0 1.0
+Matrix3x2 as south_075
+-1.0 0.0 0.0
+0.0 0.0 0.75
 Matrix3x2 as southwest
 -0.7 0.7 0.0
 0.0 0.0 1.0
 Matrix3x2 as west
 0.0 1.0 0.0
 0.0 0.0 1.0
+Matrix3x2 as west_075
+0.0 1.0 0.0
+0.0 0.0 0.75
 Matrix3x2 as northwest
 0.7 0.7 0.0
 0.0 0.0 1.0
 
-Point as octagon -32 128
-Point 32 128
-Point 128 32
-Point 128 -32
-Point 32 -128
-Point -32 -128
-Point -128 -32
-Point -128 32
+point as hallway1_left -64 -32
+point -64 32
+point -64 96
+point -64 160
+point -64 224
+point -64 288
+point -64 352
+point -64 416
+point -64 480
+point -64 544
 
-Line as octagon octagon
-test_pattern 000 no_scroll north
-test_pattern 000 no_scroll north
-Line octagon+1
-test_pattern 333 no_scroll northeast
-test_pattern 000 no_scroll northeast
-Line octagon+2
-test_pattern 222 no_scroll east
-test_pattern 000 no_scroll east
-Line octagon+3
-test_pattern 111 no_scroll southeast
-test_pattern 000 no_scroll southeast
-Line octagon+4
-test_pattern 000 no_scroll south
-test_pattern 000 no_scroll south
-Line octagon+5
-test_pattern 300 no_scroll southwest
-test_pattern 000 no_scroll southwest
-Line octagon+6
-test_pattern 030 no_scroll west
-test_pattern 000 no_scroll west
-Line octagon+7
-test_pattern 003 no_scroll northwest
-test_pattern 000 no_scroll northwest
+point as hallway1_right 64 -32
+point 64 32
+point 64 96
+point 64 160
+point 64 224
+point 64 288
+point 64 352
+point 64 416
+point 64 480
+point 64 544
 
-Sector as octagon 64 0
-test_pattern 000 no_scroll floor
-test_pattern 000 no_scroll floor
-octagon 8
+point as hallway1_outer 96 32
+point 96 96
+point 96 160
+point 96 224
+point 96 288
+point 96 352
+point 96 416
+point 96 480
 
-point as player_start 0.0 0.0
-View octagon player_start 0.0 32.0 90.0
+point as outer1 96 544
+point 512 544
+point 512 -32
+point 96 -32
 
-Point as hallway1 -32 512
-Point 32 512
+line as hallway1_seg1 hallway1_left
+wallpaper -112 no_scroll west_075
+solid 000 no_scroll west
+line hallway1_left+1
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+1
+wallpaper -112 no_scroll east_075
+solid 000 no_scroll west
+line hallway1_right
+wallpaper -112 no_scroll south_075
+solid 000 no_scroll west
 
-Line as hallway1 hallway1
-test_pattern -111 no_scroll north
-test_pattern 000 no_scroll north
-Line hallway1+1
-test_pattern -111 no_scroll east
-test_pattern 000 no_scroll east
-Line octagon+1
-test_pattern -111 no_scroll south
-test_pattern 000 no_scroll south
-Line octagon
-test_pattern -111 no_scroll west
-test_pattern 000 no_scroll west
+Sector as hallway1_seg1 96 0
+ceiling -222 no_scroll floor
+carpet -112 no_scroll floor
+hallway1_seg1 4
 
-Sector as hallway1 64 0
-test_pattern -111 no_scroll floor
-test_pattern -111 no_scroll floor
-hallway1 4
+line as hallway1_seg2 hallway1_left+1
+wallpaper -001 no_scroll west_075
+solid 000 no_scroll west
+line hallway1_left+2
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+2
+wallpaper -112 no_scroll east_075
+solid 000 no_scroll west
+line hallway1_right+1
+solid 000 no_scroll west
+solid 000 no_scroll west
 
-point as view1_start 0 480
-View hallway1 view1_start 180.0 32.0 90.0
+Sector as hallway1_seg2 96 0
+ceiling -222 no_scroll floor
+carpet -001 no_scroll floor
+hallway1_seg2 4
 
-link octagon octagon hallway1 hallway1+2
+line as hallway1_seg3 hallway1_left+2
+wallpaper -112 no_scroll west_075
+solid 000 no_scroll west
+line hallway1_left+3
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+3
+wallpaper -112 no_scroll east_075
+solid 000 no_scroll west
+line hallway1_right+2
+solid 000 no_scroll west
+solid 000 no_scroll west
 
-point as warp 192 32
-point 192 -32
+Sector as hallway1_seg3 96 0
+ceiling -222 no_scroll floor
+carpet -112 no_scroll floor
+hallway1_seg3 4
 
-Line as warp octagon+2
-solid 000 no_scroll north
-solid 000 no_scroll north
-Line warp
-solid 000 no_scroll north
-solid 000 no_scroll north
-Line warp+1
-solid 000 no_scroll north
-solid 000 no_scroll north
-Line octagon+3
-solid 000 no_scroll north
-solid 000 no_scroll north
+line as hallway1_seg4 hallway1_left+3
+wallpaper -001 no_scroll west_075
+solid 000 no_scroll west
+line hallway1_left+4
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+4
+wallpaper -112 no_scroll east_075
+solid 000 no_scroll west
+line hallway1_right+3
+solid 000 no_scroll west
+solid 000 no_scroll west
 
-sector as warp 64 0
-solid 000 no_scroll floor
-solid 000 no_scroll floor
-warp 4 warp 0 1
+Sector as hallway1_seg4 96 0
+ceiling -222 no_scroll floor
+carpet -001 no_scroll floor
+hallway1_seg4 4
 
-link octagon octagon+2 warp warp+3
+line as hallway1_seg5 hallway1_left+4
+wallpaper -112 no_scroll west_075
+solid 000 no_scroll west
+line hallway1_left+5
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+5
+wallpaper -112 no_scroll east_075
+solid 000 no_scroll west
+line hallway1_right+4
+solid 000 no_scroll west
+solid 000 no_scroll west
 
-point as warp2 -192 -32
-point -192 32
+Sector as hallway1_seg5 96 0
+ceiling -222 no_scroll floor
+carpet -112 no_scroll floor
+hallway1_seg5 4
 
-line as warp2 warp2
-solid 000 no_scroll north
-solid 000 no_scroll north
-line warp2+1
-solid 000 no_scroll north
-solid 000 no_scroll north
-line octagon+7
-solid 000 no_scroll north
-solid 000 no_scroll north
-line octagon+6
-solid 000 no_scroll north
-solid 000 no_scroll north
+line as hallway1_seg6 hallway1_left+5
+wallpaper -001 no_scroll west_075
+solid 000 no_scroll west
+line hallway1_left+6
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+6
+wallpaper -112 no_scroll east_075
+solid 000 no_scroll west
+line hallway1_right+5
+solid 000 no_scroll west
+solid 000 no_scroll west
 
-sector as warp2 64 0
-solid 000 no_scroll floor
-solid 000 no_scroll floor
-warp2 4 warp 1 0
+Sector as hallway1_seg6 96 0
+ceiling -222 no_scroll floor
+carpet -001 no_scroll floor
+hallway1_seg6 4
 
-link octagon octagon+6 warp2 warp2+2
+line as hallway1_seg7 hallway1_left+6
+wallpaper -112 no_scroll west_075
+solid 000 no_scroll west
+line hallway1_left+7
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+7
+wallpaper -112 no_scroll east_075
+solid 000 no_scroll west
+line hallway1_right+6
+solid 000 no_scroll west
+solid 000 no_scroll west
+
+Sector as hallway1_seg7 96 0
+ceiling -222 no_scroll floor
+carpet -112 no_scroll floor
+hallway1_seg7 4
+
+line as hallway1_seg8 hallway1_left+7
+wallpaper -001 no_scroll west_075
+solid 000 no_scroll west
+line hallway1_left+8
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+8
+wallpaper -112 no_scroll east_075
+solid 000 no_scroll west
+line hallway1_right+7
+solid 000 no_scroll west
+solid 000 no_scroll west
+
+Sector as hallway1_seg8 96 0
+ceiling -222 no_scroll floor
+carpet -001 no_scroll floor
+hallway1_seg8 4
+
+line as hallway1_seg9 hallway1_left+8
+wallpaper -112 no_scroll west_075
+solid 000 no_scroll west
+line hallway1_left+9
+wallpaper -112 no_scroll north_075
+solid 000 no_scroll west
+line hallway1_right+9
+wallpaper -112 no_scroll east_075
+solid 000 no_scroll west
+line hallway1_right+8
+solid 000 no_scroll west
+solid 000 no_scroll west
+
+Sector as hallway1_seg9 96 0
+ceiling -222 no_scroll floor
+carpet -112 no_scroll floor
+hallway1_seg9 4
+
+link hallway1_seg1 hallway1_seg1+1 hallway1_seg2 hallway1_seg2+3
+link hallway1_seg2 hallway1_seg2+1 hallway1_seg3 hallway1_seg3+3
+link hallway1_seg3 hallway1_seg3+1 hallway1_seg4 hallway1_seg4+3
+link hallway1_seg4 hallway1_seg4+1 hallway1_seg5 hallway1_seg5+3
+link hallway1_seg5 hallway1_seg5+1 hallway1_seg6 hallway1_seg6+3
+link hallway1_seg6 hallway1_seg6+1 hallway1_seg7 hallway1_seg7+3
+link hallway1_seg7 hallway1_seg7+1 hallway1_seg8 hallway1_seg8+3
+link hallway1_seg8 hallway1_seg8+1 hallway1_seg9 hallway1_seg9+3
+
+line as hallway1_outer1 hallway1_right+1
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+2
+wallpaper -001 no_scroll north
+solid 000 no_scroll west
+line hallway1_outer+1
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer
+wallpaper -001 no_scroll south
+solid 000 no_scroll west
+
+Sector as hallway1_outer1 64 0
+ceiling 000 no_scroll floor
+carpet -001 no_scroll floor
+hallway1_outer1 4
+
+link hallway1_seg2 hallway1_seg2+2 hallway1_outer1 hallway1_outer1
+
+line as hallway1_outer2 hallway1_right+3
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+4
+wallpaper -001 no_scroll north
+solid 000 no_scroll west
+line hallway1_outer+3
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer+2
+wallpaper -001 no_scroll south
+solid 000 no_scroll west
+
+Sector as hallway1_outer2 64 0
+ceiling 000 no_scroll floor
+carpet -001 no_scroll floor
+hallway1_outer2 4
+
+link hallway1_seg4 hallway1_seg4+2 hallway1_outer2 hallway1_outer2
+
+line as hallway1_outer3 hallway1_right+5
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+6
+wallpaper -001 no_scroll north
+solid 000 no_scroll west
+line hallway1_outer+5
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer+4
+wallpaper -001 no_scroll south
+solid 000 no_scroll west
+
+Sector as hallway1_outer3 64 0
+ceiling 000 no_scroll floor
+carpet -001 no_scroll floor
+hallway1_outer3 4
+
+link hallway1_seg6 hallway1_seg6+2 hallway1_outer3 hallway1_outer3
+
+line as hallway1_outer4 hallway1_right+7
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_right+8
+wallpaper -001 no_scroll north
+solid 000 no_scroll west
+line hallway1_outer+7
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer+6
+wallpaper -001 no_scroll south
+solid 000 no_scroll west
+
+Sector as hallway1_outer4 64 0
+ceiling 000 no_scroll floor
+carpet -001 no_scroll floor
+hallway1_outer4 4
+
+link hallway1_seg8 hallway1_seg8+2 hallway1_outer4 hallway1_outer4
+
+line as outer1 hallway1_outer
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer+1
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer+2
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer+3
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer+4
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer+5
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer+6
+solid 000 no_scroll west
+solid 000 no_scroll west
+line hallway1_outer+7
+solid 000 no_scroll west
+solid 000 no_scroll west
+line outer1
+clouds 000 no_scroll north
+clouds 000 no_scroll west
+line outer1+1
+clouds 000 no_scroll east
+clouds 000 no_scroll west
+line outer1+2
+clouds 000 no_scroll south
+clouds 000 no_scroll west
+line outer1+3
+solid 000 no_scroll west
+solid 000 no_scroll west
+
+Sector as outer1 256 -256
+clouds 000 no_scroll floor
+clouds 000 no_scroll floor
+outer1 12
+
+link hallway1_outer1 hallway1_outer1+2 outer1 outer1
+link hallway1_outer2 hallway1_outer2+2 outer1 outer1+2
+link hallway1_outer3 hallway1_outer3+2 outer1 outer1+4
+link hallway1_outer4 hallway1_outer4+2 outer1 outer1+6
+
+point as view1_start 0 0
+View hallway1_seg1 view1_start 0.0 32.0 90.0
