@@ -8,6 +8,13 @@ import pathlib
 import math
 
 linenum : int = 0
+warned : bool = False
+
+def warn(msg : str):
+    global warned
+
+    print(f"{linenum}: WARNING: {msg}")
+    warned = True
 
 class NotEnoughTokens(Exception):
     pass
@@ -148,7 +155,7 @@ def parse_shade(tokens : list[str], token : int) -> tuple[int, int]:
         first = 1
 
     if len(color) != first + 3:
-        raise ValueError("A shade needs to be in [+-]RGB format.")
+        raise ValueError(f"{linenum}: A shade needs to be in [+-]RGB format.")
 
     r = int(color[first])
     g = int(color[first+1])
@@ -157,7 +164,8 @@ def parse_shade(tokens : list[str], token : int) -> tuple[int, int]:
     if r < 0 or r > 3 or \
        g < 0 or g > 3 or \
        b < 0 or b > 3:
-        raise ValueError("Any RGB value must be between 0 and 3.")
+        # might not do anything sensible, but it's nonfatal
+        warn("Any RGB value must be between 0 and 3.")
 
     # RR.GG.BB
     return ((r << 6) | (g << 3) | b) * mul, nexttoken
@@ -191,6 +199,7 @@ def parse_action(tokens : list[str], token : int) -> tuple[int, int]:
         # action token is optional, so just return none and don't consume tokens rather than error
         return 0, token
 
+    # TODO solid/blocking sector
     match actionstr.lower():
         case "none":
             return Action.NONE.value, token
@@ -350,6 +359,7 @@ class Line:
     @staticmethod
     def parse(tokens : list[str], token : int) -> tuple[Line, int]:
         point : int
+        # TODO: store wall texture info in its own class and write it to its own list in the file and refer to it by int
         texture1 : int
         texture2 : int
         shade1 : tuple[int]
@@ -413,6 +423,7 @@ class Sector:
     def parse(tokens : list[str], token : int) -> tuple[Sector, int]:
         nexttoken : int
         height : tuple[float, float]
+        # TODO probably store these too
         texture1 : int
         texture2 : int
         shade1 : tuple(int)
@@ -445,6 +456,16 @@ class Sector:
             raise ValueError(f"{linenum}: A sector needs at least 3 lines, or up to 259.")
         if line + linecount > len(Line.storage):
             raise ValueError(f"{linenum}: Lines {line} - {line + linecount} goes past end of lines list ({len(Line.storage)}).")
+        # duplicate points on a sector wall breaks rendering?
+        # might catch some mistakes too.
+        for i in range(linecount):
+            for j in range(linecount - i - 1):
+                # the points themselves shouldn't need to be compared, but at least 1 needs to be fetched anyway
+                # to print the point coordinates
+                point1 = Point.storage[Point.aliases[Line.storage[line+i].point]]
+                point2 = Point.storage[Point.aliases[Line.storage[line+i+1+j].point]]
+                if point1 == point2:
+                    warn(f"Lines {i} and {j} share a point {point1.x}, {point1.y}.")
 
         action, token = parse_action(tokens, token)
 
@@ -523,7 +544,8 @@ class Link:
         # sector lines are clockwise so linked walls will share opposite points
         if line1points[0] != line2points[1] or \
            line2points[1] != line1points[0]:
-            raise ValueError(f"{linenum}: Linked walls must share points. Have: {line1points[0]}-{line1points[1]}, {line2points[0]}-{line2points[1]}")
+            # probably will horribly break rendering but it can technically be stored
+            warn(f"Linked walls must share points (no \"portal\" rendering). Have: {line1points[0]}-{line1points[1]}, {line2points[0]}-{line2points[1]}")
 
         return Link(sectorindex, lindex, lsectorindex, llindex), token
 
@@ -733,6 +755,9 @@ def main():
         for n, view in enumerate(View.storage):
             print(n, view)
             outfile.write(view.serialize())
+
+    if warned:
+        print("There were warnings.")
 
 if __name__ == '__main__':
     main()
