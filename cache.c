@@ -194,10 +194,10 @@ int load_tex(unsigned char number, unsigned char **data) {
             }
         } else if(texslot[i].dim == SMALL_TEX_DIM) {
             for(j = 0; j < 4; j++) {
-                if(texslot[i].s_number[i] == number) {
+                if(texslot[i].s_number[j] == number) {
                     *data = &(texmem[i * LARGE_TEX_SIZE + (j * SMALL_TEX_SIZE)]);
                     found = SMALL_TEX_DIM;
-                    texslot[i].s_age[i] = 0;
+                    texslot[i].s_age[j] = 0;
                     /*
                     LOG("Found in small slot %d %d\n", i, j);
                     */
