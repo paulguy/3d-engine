@@ -40,6 +40,8 @@
 #include "engine.h"
 #include "cache.h"
 
+#define GFX_READ_BUF (32)
+
 static Window *s_window;
 static GFont s_font;
 static Layer *s_text_layer;
@@ -86,61 +88,166 @@ void close_map() {
     /* nothing to do */
 }
 
+/*
+# image parameters
+# edge dimension (32, 64) (1b)
+# storage direction (horizontal/vertical) (1b)
+# palette size (2, 4, 8, 16, 32, 64) (3b)
+# RLE repeat word size (uncompressed, 2, 3, 4, 5, 6, 7, 8) (3b)
+# 64 color palette = direct color
+*/
+
 int get_graphic_dim(unsigned char number) {
     ResHandle handle;
-    size_t res_size;
+    unsigned char header;
 
     if(number > MAX_TEX_ID) {
         return(-1);
     }
 
     handle = resource_get_handle(TEX_IDS[number]);
+    resource_load_byte_range(handle, 0, &header, 1);
 
-    res_size = resource_size(handle);
-
-    if(res_size == SMALL_TEX_RES_SIZE) {
-        return(SMALL_TEX_DIM);
-    } else if(res_size == LARGE_TEX_RES_SIZE) {
-        return(LARGE_TEX_DIM);
+    if(header & 0x80) {
+        /* bit set = 64 */
+        return(64);
     }
 
-    /* return invalid size */
-    return(0);
+    return(32);
 }
 
-int load_graphic(unsigned char number, unsigned char *data) {
-    unsigned int in, out;
-    ResHandle handle;
-    size_t res_size;
-    size_t tex_size;
+/* avoid passing these along on the stack a bunch or weird silent stack/heap overflows */
+static ResHandle gfx;
+static unsigned int gfx_filepos;
+static unsigned char gfx_bufpos;
+static unsigned char gfx_byte;
+static unsigned char gfx_bit;
+static unsigned char gfx_palette[32];
+static unsigned char gfx_buf[GFX_READ_BUF];
+
+static void read_byte() {
+    if(gfx_bufpos == GFX_READ_BUF) {
+        resource_load_byte_range(gfx, gfx_filepos + GFX_READ_BUF, gfx_buf, GFX_READ_BUF);
+        gfx_filepos += GFX_READ_BUF;
+        gfx_bufpos = 0;
+    }
+
+    gfx_byte = gfx_buf[gfx_bufpos];
+    gfx_bufpos += 1;
+}
+
+static unsigned char read_bits(unsigned char count) {
+    /* simple bit unpacking function that can only unpack up to 8 bits! */
+    unsigned char val;
+
+    /* mask out leading bits */
+    val = gfx_byte & (0xFF >> gfx_bit);
+    /* advance bit position */
+    gfx_bit += count;
+    if(gfx_bit < 8) {
+        /* not aligned */
+
+        /* align the value to the least significant bit and return it */
+        return(val >> (8 - gfx_bit));
+    } else if(gfx_bit > 8) {
+        /* more to copy */
+        read_byte(gfx_buf);
+
+        /* bring bit back in to the next byte */
+        gfx_bit -= 8; /* bit is now the remaining bits needed */
+        /* shift what's been copied to make room and OR in the rest */
+        return((val << gfx_bit) | ((gfx_byte & (0xFF << (8 - gfx_bit))) >> (8 - gfx_bit)));
+    }
+
+    /* value's all read in and aligned so just return it */
+    gfx_bit = 0;
+    read_byte(gfx_buf);
+    return(val);
+}
+
+int load_graphic(unsigned char number,
+                 unsigned char *data) {
+    unsigned short i, j;
+    unsigned char x, y;
+    unsigned char dimension;
+    char vertical;
+    unsigned char palette_size, color_bits;
+    unsigned char repeat_bits;
+    unsigned char repeats, color;
 
     if(number > MAX_TEX_ID) {
         return(-1);
     }
 
-    handle = resource_get_handle(TEX_IDS[number]);
+    gfx = resource_get_handle(TEX_IDS[number]);
+    /* initial buffer fill */
+    resource_load_byte_range(gfx, 0, gfx_buf, GFX_READ_BUF);
+    /* set up buffer and read first byte */
+    gfx_filepos = 0;
+    gfx_bufpos = 0;
+    gfx_bit = 0;
+    read_byte();
 
-    res_size = resource_size(handle);
+    if(read_bits(1)) {
+        dimension = 64;
+    } else {
+        dimension = 32;
+    }
+    vertical = read_bits(1);
+    color_bits = read_bits(3); /* 0-7, 0 and 7 are invalid... but this doesn't chack for that */
+    repeat_bits = read_bits(3);
+    repeat_bits = repeat_bits > 0 ? repeat_bits + 1 : 0; /* 0 (uncompressed), 2-8 */
 
-    if(res_size == SMALL_TEX_RES_SIZE) {
-        tex_size = SMALL_TEX_SIZE;
-    } else { /* LARGE_TEX_RES_SIZE */
-        tex_size = LARGE_TEX_SIZE;
+    if(color_bits < 6) {
+        /* 6 bits is direct color, 5 and below is paletted */
+        /* BUG yeah yeah i know, but this isn't user-provided data... */
+        /* palette size is 1-32 */
+        palette_size = read_bits(5) + 1;
+        for(i = 0; i < palette_size; i++) {
+            color = read_bits(6);
+            gfx_palette[i] = ((color & 0x30) << 2) | ((color & 0x0C) << 1) | (color & 0x03);
+        }
     }
 
-    /* load in and unpack in place */
-    resource_load(handle, &(data[tex_size - res_size]), res_size);
-    out = 0;
-    for(in = tex_size - res_size; in < tex_size; in += 3) {
-        /* ######.. -> ##.##.## */
-        data[out] = (data[in] & 0xC0) | ((data[in] & 0x30) >> 1) | ((data[in] & 0x0C) >> 2);
-        /* ......## -> ##. ##.## <- ####.... */
-        data[out+1] = ((data[in] & 0x03) << 6) | ((data[in+1] & 0xC0) >> 3) | ((data[in+1] & 0x30) >> 4);
-        /* ....#### -> ##.## .## <- ##...... */
-        data[out+2] = ((data[in+1] & 0x0C) << 4) | ((data[in+1] & 0x03) << 3) | ((data[in+2] & 0xC0) >> 6);
-        /* ..###### -> ##.##.## */
-        data[out+3] = ((data[in+2] & 0x30) << 2) | ((data[in+2] & 0x0C) << 1) | (data[in+2] & 0x03);
-        out += 4;
+    i = 0;
+    if(repeat_bits == 0) {
+        /* uncompressed */
+        for(i = 0; i < dimension * dimension; i++) {
+            color = read_bits(color_bits);
+            if(color_bits < 6) {
+                /* paletted */
+                color = gfx_palette[color];
+            } else {
+                color = ((color & 0x30) << 2) | ((color & 0x0C) << 1) | (color & 0x03);
+            }
+            data[i] = color;
+        }
+    } else {
+        while(i < dimension * dimension) {
+            /* repeats starts at 1 */
+            repeats = read_bits(repeat_bits) + 1;
+            /* clamp repeats to data size */
+            repeats = i + repeats > dimension * dimension ? (dimension * dimension) - i : repeats;
+            color = read_bits(color_bits);
+            if(color_bits < 6) {
+                /* paletted */
+                color = gfx_palette[color];
+            } else {
+                color = ((color & 0x30) << 2) | ((color & 0x0C) << 1) | (color & 0x03);
+            }
+            if(vertical) {
+                for(j = 0; j < repeats; j++) {
+                    y = (i+j) / dimension;
+                    x = (i+j) % dimension;
+                    data[x * dimension + y] = color;
+                }
+            } else {
+                for(j = 0; j < repeats; j++) {
+                    data[i+j] = color;
+                }
+            }
+            i += repeats;
+        }
     }
 
     return(0);
