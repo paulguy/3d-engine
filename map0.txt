@@ -47,6 +47,10 @@ Matrix3x2 as northwest
 0.7 0.7 0.0
 0.0 0.0 1.0
 
+Matrix3x2 as sky
+2.0 0.0 0.0
+0.0 2.0 0.0
+
 point as hallway1_left -64 -32
 point -64 32
 point -64 96
@@ -78,171 +82,166 @@ point 96 352
 point 96 416
 point 96 480
 
-point as outer1 96 544
-point 512 544
-point 512 -32
-point 96 -32
-
 line as hallway1_seg1 hallway1_left
-wallpaper -112 no_scroll west_075
+wallpaper sub 112 no_scroll west_075
 solid 000 no_scroll west
 line hallway1_left+1
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+1
-wallpaper -112 no_scroll east_075
+wallpaper sub 112 no_scroll east_075
 solid 000 no_scroll west
 line hallway1_right
-wallpaper -112 no_scroll south_075
+wallpaper sub 112 no_scroll south_075
 solid 000 no_scroll west
 
-Sector as hallway1_seg1 96 0
-ceiling -222 no_scroll floor
-carpet -112 no_scroll floor
+Sector as hallway1_seg1 85.3 0
+ceiling sub 222 no_scroll floor
+carpet sub 112 no_scroll floor
 hallway1_seg1 4
 
 line as hallway1_seg2 hallway1_left+1
-wallpaper -001 no_scroll west_075
+wallpaper sub 001 no_scroll west_075
 solid 000 no_scroll west
 line hallway1_left+2
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+2
-wallpaper -112 no_scroll east_075
+wallpaper sub 112 no_scroll east_075
 solid 000 no_scroll west
 line hallway1_right+1
 solid 000 no_scroll west
 solid 000 no_scroll west
 
-Sector as hallway1_seg2 96 0
-ceiling -222 no_scroll floor
-carpet -001 no_scroll floor
+Sector as hallway1_seg2 85.3 0
+ceiling sub 222 no_scroll floor
+carpet sub 001 no_scroll floor
 hallway1_seg2 4
 
 line as hallway1_seg3 hallway1_left+2
-wallpaper -112 no_scroll west_075
+wallpaper sub 112 no_scroll west_075
 solid 000 no_scroll west
 line hallway1_left+3
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+3
-wallpaper -112 no_scroll east_075
+wallpaper sub 112 no_scroll east_075
 solid 000 no_scroll west
 line hallway1_right+2
 solid 000 no_scroll west
 solid 000 no_scroll west
 
-Sector as hallway1_seg3 96 0
-ceiling -222 no_scroll floor
-carpet -112 no_scroll floor
+Sector as hallway1_seg3 85.3 0
+ceiling sub 222 no_scroll floor
+carpet sub 112 no_scroll floor
 hallway1_seg3 4
 
 line as hallway1_seg4 hallway1_left+3
-wallpaper -001 no_scroll west_075
+wallpaper sub 001 no_scroll west_075
 solid 000 no_scroll west
 line hallway1_left+4
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+4
-wallpaper -112 no_scroll east_075
+wallpaper sub 112 no_scroll east_075
 solid 000 no_scroll west
 line hallway1_right+3
 solid 000 no_scroll west
 solid 000 no_scroll west
 
-Sector as hallway1_seg4 96 0
-ceiling -222 no_scroll floor
-carpet -001 no_scroll floor
+Sector as hallway1_seg4 85.3 0
+ceiling sub 222 no_scroll floor
+carpet sub 001 no_scroll floor
 hallway1_seg4 4
 
 line as hallway1_seg5 hallway1_left+4
-wallpaper -112 no_scroll west_075
+wallpaper sub 112 no_scroll west_075
 solid 000 no_scroll west
 line hallway1_left+5
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+5
-wallpaper -112 no_scroll east_075
+wallpaper sub 112 no_scroll east_075
 solid 000 no_scroll west
 line hallway1_right+4
 solid 000 no_scroll west
 solid 000 no_scroll west
 
-Sector as hallway1_seg5 96 0
-ceiling -222 no_scroll floor
-carpet -112 no_scroll floor
+Sector as hallway1_seg5 85.3 0
+ceiling sub 222 no_scroll floor
+carpet sub 112 no_scroll floor
 hallway1_seg5 4
 
 line as hallway1_seg6 hallway1_left+5
-wallpaper -001 no_scroll west_075
+wallpaper sub 001 no_scroll west_075
 solid 000 no_scroll west
 line hallway1_left+6
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+6
-wallpaper -112 no_scroll east_075
+wallpaper sub 112 no_scroll east_075
 solid 000 no_scroll west
 line hallway1_right+5
 solid 000 no_scroll west
 solid 000 no_scroll west
 
-Sector as hallway1_seg6 96 0
-ceiling -222 no_scroll floor
-carpet -001 no_scroll floor
+Sector as hallway1_seg6 85.3 0
+ceiling sub 222 no_scroll floor
+carpet sub 001 no_scroll floor
 hallway1_seg6 4
 
 line as hallway1_seg7 hallway1_left+6
-wallpaper -112 no_scroll west_075
+wallpaper sub 112 no_scroll west_075
 solid 000 no_scroll west
 line hallway1_left+7
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+7
-wallpaper -112 no_scroll east_075
+wallpaper sub 112 no_scroll east_075
 solid 000 no_scroll west
 line hallway1_right+6
 solid 000 no_scroll west
 solid 000 no_scroll west
 
-Sector as hallway1_seg7 96 0
-ceiling -222 no_scroll floor
-carpet -112 no_scroll floor
+Sector as hallway1_seg7 85.3 0
+ceiling sub 222 no_scroll floor
+carpet sub 112 no_scroll floor
 hallway1_seg7 4
 
 line as hallway1_seg8 hallway1_left+7
-wallpaper -001 no_scroll west_075
+wallpaper sub 001 no_scroll west_075
 solid 000 no_scroll west
 line hallway1_left+8
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+8
-wallpaper -112 no_scroll east_075
+wallpaper sub 112 no_scroll east_075
 solid 000 no_scroll west
 line hallway1_right+7
 solid 000 no_scroll west
 solid 000 no_scroll west
 
-Sector as hallway1_seg8 96 0
-ceiling -222 no_scroll floor
-carpet -001 no_scroll floor
+Sector as hallway1_seg8 85.3 0
+ceiling sub 222 no_scroll floor
+carpet sub 001 no_scroll floor
 hallway1_seg8 4
 
 line as hallway1_seg9 hallway1_left+8
-wallpaper -112 no_scroll west_075
+wallpaper sub 112 no_scroll west_075
 solid 000 no_scroll west
 line hallway1_left+9
-wallpaper -112 no_scroll north_075
+wallpaper sub 112 no_scroll north_075
 solid 000 no_scroll west
 line hallway1_right+9
-wallpaper -112 no_scroll east_075
+wallpaper sub 112 no_scroll east_075
 solid 000 no_scroll west
 line hallway1_right+8
 solid 000 no_scroll west
 solid 000 no_scroll west
 
-Sector as hallway1_seg9 96 0
-ceiling -222 no_scroll floor
-carpet -112 no_scroll floor
+Sector as hallway1_seg9 85.3 0
+ceiling sub 222 no_scroll floor
+carpet sub 112 no_scroll floor
 hallway1_seg9 4
 
 link hallway1_seg1 hallway1_seg1+1 hallway1_seg2 hallway1_seg2+3
@@ -258,18 +257,18 @@ line as hallway1_outer1 hallway1_right+1
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+2
-wallpaper -001 no_scroll north
+wallpaper sub 001 no_scroll north
 solid 000 no_scroll west
 line hallway1_outer+1
-solid 000 no_scroll west
+clouds parallax 000 no_scroll sky
 solid 000 no_scroll west
 line hallway1_outer
-wallpaper -001 no_scroll south
+wallpaper sub 001 no_scroll south
 solid 000 no_scroll west
 
 Sector as hallway1_outer1 64 0
 ceiling 000 no_scroll floor
-carpet -001 no_scroll floor
+carpet sub 001 no_scroll floor
 hallway1_outer1 4
 
 link hallway1_seg2 hallway1_seg2+2 hallway1_outer1 hallway1_outer1
@@ -278,18 +277,18 @@ line as hallway1_outer2 hallway1_right+3
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+4
-wallpaper -001 no_scroll north
+wallpaper sub 001 no_scroll north
 solid 000 no_scroll west
 line hallway1_outer+3
-solid 000 no_scroll west
+clouds parallax 000 no_scroll sky
 solid 000 no_scroll west
 line hallway1_outer+2
-wallpaper -001 no_scroll south
+wallpaper sub 001 no_scroll south
 solid 000 no_scroll west
 
 Sector as hallway1_outer2 64 0
 ceiling 000 no_scroll floor
-carpet -001 no_scroll floor
+carpet sub 001 no_scroll floor
 hallway1_outer2 4
 
 link hallway1_seg4 hallway1_seg4+2 hallway1_outer2 hallway1_outer2
@@ -298,18 +297,18 @@ line as hallway1_outer3 hallway1_right+5
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+6
-wallpaper -001 no_scroll north
+wallpaper sub 001 no_scroll north
 solid 000 no_scroll west
 line hallway1_outer+5
-solid 000 no_scroll west
+clouds parallax 000 no_scroll sky
 solid 000 no_scroll west
 line hallway1_outer+4
-wallpaper -001 no_scroll south
+wallpaper sub 001 no_scroll south
 solid 000 no_scroll west
 
 Sector as hallway1_outer3 64 0
 ceiling 000 no_scroll floor
-carpet -001 no_scroll floor
+carpet sub 001 no_scroll floor
 hallway1_outer3 4
 
 link hallway1_seg6 hallway1_seg6+2 hallway1_outer3 hallway1_outer3
@@ -318,68 +317,21 @@ line as hallway1_outer4 hallway1_right+7
 solid 000 no_scroll west
 solid 000 no_scroll west
 line hallway1_right+8
-wallpaper -001 no_scroll north
+wallpaper sub 001 no_scroll north
 solid 000 no_scroll west
 line hallway1_outer+7
-solid 000 no_scroll west
+clouds parallax 000 no_scroll sky
 solid 000 no_scroll west
 line hallway1_outer+6
-wallpaper -001 no_scroll south
+wallpaper sub 001 no_scroll south
 solid 000 no_scroll west
 
 Sector as hallway1_outer4 64 0
 ceiling 000 no_scroll floor
-carpet -001 no_scroll floor
+carpet sub 001 no_scroll floor
 hallway1_outer4 4
 
 link hallway1_seg8 hallway1_seg8+2 hallway1_outer4 hallway1_outer4
 
-line as outer1 hallway1_outer
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_outer+1
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_outer+2
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_outer+3
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_outer+4
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_outer+5
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_outer+6
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_outer+7
-solid 000 no_scroll west
-solid 000 no_scroll west
-line outer1
-clouds 000 no_scroll north
-clouds 000 no_scroll west
-line outer1+1
-clouds 000 no_scroll east
-clouds 000 no_scroll west
-line outer1+2
-clouds 000 no_scroll south
-clouds 000 no_scroll west
-line outer1+3
-solid 000 no_scroll west
-solid 000 no_scroll west
-
-Sector as outer1 256 -256
-clouds 000 no_scroll floor
-clouds 000 no_scroll floor
-outer1 12
-
-link hallway1_outer1 hallway1_outer1+2 outer1 outer1
-link hallway1_outer2 hallway1_outer2+2 outer1 outer1+2
-link hallway1_outer3 hallway1_outer3+2 outer1 outer1+4
-link hallway1_outer4 hallway1_outer4+2 outer1 outer1+6
-
 point as view1_start 0 0
-View hallway1_seg1 view1_start 0.0 32.0 90.0
+View hallway1_seg1 view1_start 0.0 32.0 60.0

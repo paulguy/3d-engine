@@ -72,7 +72,6 @@ SDL_Surface *load_png_checked(unsigned char number) {
 }
 
 int get_graphic_dim(unsigned char number) {
-    LOG("%hhd\n", number);
     SDL_Surface *png = load_png_checked(number);
     if(png == NULL) {
         return(-1);

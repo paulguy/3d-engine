@@ -43,7 +43,7 @@ typedef struct Line_s {
     Sector *sector;
 
     unsigned char texture[2];
-    short shade[2];
+    unsigned short shade[2];
     Point *texture_bias[2];
     Matrix3x2 *texture_transform[2];
 } Line;
@@ -55,7 +55,7 @@ typedef struct Sector_s {
     float height[2];
 
     unsigned char texture[2];
-    short shade[2];
+    unsigned short shade[2];
     Point *texture_bias[2];
     Matrix2x2 *texture_transform[2];
 

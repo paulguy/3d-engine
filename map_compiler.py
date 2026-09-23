@@ -137,51 +137,46 @@ def get_single_named(T : Type,
 
     return get_single(T, tokens, token, fieldstr)
 
+SUB_MASK = 0x100
+PARALLAX_MASK = 0x200
 def parse_shade(tokens : list[str], token : int) -> tuple[int, int]:
-    nexttoken : int = check_tokens(tokens, token, 1)
-
-    color : str = tokens[token]
+    nexttoken : int
     r : int
     g : int
     b : int
+    sub : int = 0
+    parallax : int = 0
 
-    first = 0
-    mul = 1
+    while True:
+        nexttoken = check_tokens(tokens, token, 1)
 
-    if color[0] == '-':
-        mul = -1
-        first = 1
-    elif color[0] == '+':
-        first = 1
+        if tokens[token].isdigit():
+            color : str = tokens[token]
+            if len(color) != 3:
+                raise ValueError(f"{linenum}: Color value must be 3 digits")
 
-    if len(color) != first + 3:
-        raise ValueError(f"{linenum}: A shade needs to be in [+-]RGB format.")
+            r : int = int(color[0])
+            g : int = int(color[1])
+            b : int = int(color[2])
 
-    r = int(color[first])
-    g = int(color[first+1])
-    b = int(color[first+2])
+            if r < 0 or r > 3 or \
+               g < 0 or g > 3 or \
+               b < 0 or b > 3:
+                # might not do anything sensible, but it's nonfatal
+                warn("Any RGB value must be between 0 and 3.")
+            break
+        elif tokens[token].lower() == 'sub':
+            sub = SUB_MASK
+        elif tokens[token].lower() == 'parallax':
+            parallax = PARALLAX_MASK
 
-    if r < 0 or r > 3 or \
-       g < 0 or g > 3 or \
-       b < 0 or b > 3:
-        # might not do anything sensible, but it's nonfatal
-        warn("Any RGB value must be between 0 and 3.")
+        token = nexttoken
 
     # RR.GG.BB
-    return ((r << 6) | (g << 3) | b) * mul, nexttoken
+    return ((r << 6) | (g << 3) | b) | sub | parallax, nexttoken
 
 def shade_str(val : int) -> str:
-    negative : bool = False
-    if val < 0:
-        val = -val
-        negative = True
-    return f"{'-' if negative else ''}{(val & 0xC0) >> 6}{(val & 0x18) >> 3}{val & 0x03}"
-
-def make_shade(val : int) -> int:
-    if val < 0:
-        return 0xFF00 | (-val & 0xFF)
-
-    return val & 0xFF
+    return f"{'sub ' if val & SUB_MASK else ''}{'parallax ' if val & PARALLAX_MASK else ''}{(val & 0xC0) >> 6}{(val & 0x18) >> 3}{val & 0x03}"
 
 class Action(Enum):
     NONE = 0x00
@@ -352,7 +347,7 @@ class Line:
     def serialize(self):
         return Line.STRUCT.pack(self.point,
                                 self.textures[0], self.textures[1],
-                                make_shade(self.shade[0]), make_shade(self.shade[1]),
+                                self.shade[0], self.shade[1],
                                 self.texture_bias[0], self.texture_bias[1],
                                 self.texture_transform[0], self.texture_transform[1])
 
@@ -407,7 +402,7 @@ class Sector:
     def serialize(self):
         return Sector.STRUCT.pack(self.height[0], self.height[1],
                                   self.textures[0], self.textures[1],
-                                  make_shade(self.shade[0]), make_shade(self.shade[1]),
+                                  self.shade[0], self.shade[1],
                                   self.texture_bias[0], self.texture_bias[1],
                                   self.texture_transform[0], self.texture_transform[1],
                                   self.firstline, self.lines - 3,
