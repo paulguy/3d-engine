@@ -10,6 +10,10 @@ Matrix2x2 as floor
 1.0 0.0
 0.0 1.0
 
+Matrix2x2 as sky
+2.0 0.0
+0.0 2.0
+
 Matrix3x2 as north
 1.0 0.0 0.0
 0.0 0.0 1.0
@@ -82,6 +86,11 @@ point 96 352
 point 96 416
 point 96 480
 
+point as skybox -32 -32
+point 32 -32
+point 32 -64
+point -32 -64
+
 line as hallway1_seg1 hallway1_left
 wallpaper sub 112 no_scroll west_075
 solid 000 no_scroll west
@@ -94,11 +103,37 @@ solid 000 no_scroll west
 line hallway1_right
 wallpaper sub 112 no_scroll south_075
 solid 000 no_scroll west
+line skybox+1
+solid 000 no_scroll west
+wallpaper sub 110 no_scroll south_075
+line skybox
+wallpaper sub 112 no_scroll south_075
+solid 000 no_scroll west
 
 Sector as hallway1_seg1 85.3 0
 ceiling sub 222 no_scroll floor
 carpet sub 112 no_scroll floor
-hallway1_seg1 4
+hallway1_seg1 6
+
+line as skybox skybox
+solid 000 no_scroll west
+solid 000 no_scroll west
+line skybox+1
+wallpaper sub 110 no_scroll east_075
+solid 000 no_scroll west
+line skybox+2
+wallpaper sub 110 no_scroll south_075
+solid 000 no_scroll west
+line skybox+3
+wallpaper sub 110 no_scroll west_075
+solid 000 no_scroll west
+
+sector as skybox 96 32
+clouds parallax 000 no_scroll sky
+carpet sub 110 no_scroll floor
+skybox 4
+
+link hallway1_seg1 hallway1_seg1+4 skybox skybox
 
 line as hallway1_seg2 hallway1_left+1
 wallpaper sub 001 no_scroll west_075

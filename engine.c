@@ -699,8 +699,13 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     if(ceiling_dim == 0) {
                         color = 0x00;
                     } else {
-                        wx = v.pos.x + (slope.x * z);
-                        wy = v.pos.y + (slope.y * z);
+                        if(s->shade[CEILING] & SHADE_PARALLAX) {
+                            wx = (float)x / w * ceiling_dim;
+                            wy = (float)y / h * ceiling_dim;
+                        } else {
+                            wx = v.pos.x + (slope.x * z);
+                            wy = v.pos.y + (slope.y * z);
+                        }
                         tx = (wx * texture_transform_22->xx) +
                              (wy * texture_transform_22->xy) +
                              texture_bias->x;
@@ -745,8 +750,13 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     if(floor_dim == 0) {
                         color = 0x00;
                     } else {
-                        wx = v.pos.x + (slope.x * z);
-                        wy = v.pos.y + (slope.y * z);
+                        if(s->shade[FLOOR] & SHADE_PARALLAX) {
+                            wx = (float)x / w * floor_dim;
+                            wy = (float)y / h * floor_dim;
+                        } else {
+                            wx = v.pos.x + (slope.x * z);
+                            wy = v.pos.y + (slope.y * z);
+                        }
                         tx = (wx * texture_transform_22->xx) +
                              (wy * texture_transform_22->xy) +
                              texture_bias->x;
@@ -909,7 +919,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 }
 
                 if(line->shade[FLOOR] & SHADE_PARALLAX) {
-                    wx = (float)x / w * top_line_dim;
+                    wx = (float)x / w * bottom_line_dim;
                 } else {
                     wx = v.pos.x + (slope.x * total_distance);
                     wy = v.pos.y + (slope.y * total_distance);
@@ -921,7 +931,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     y >= next_y && y >= 0;
                     y--) {
                     if(line->shade[FLOOR] & SHADE_PARALLAX) {
-                        wy = (float)y / h * top_line_dim;
+                        wy = (float)y / h * bottom_line_dim;
                     }
 
                     if(bottom_line_dim == 0) {
