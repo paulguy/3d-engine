@@ -626,15 +626,25 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     Point *texture_bias;
     Matrix2x2 *texture_transform_22;
     Matrix3x2 *texture_transform_32;
+    float x_ratio;
+    float y_ratio;
 
     float w_2 = (float)w / 2.0;
     float h_2 = (float)h / 2.0;
     float fov_2 = v.fov / 2.0;
     float sin_angle = sin(v.angle);
     float cos_angle = cos(v.angle);
-    float max_offset = atan2(fov_2, 1.0) * 2.0;
+    float max_offset = atan2f(fov_2, 1.0) * 2.0;
 
     age_slots();
+
+    if(w > h) {
+        x_ratio = (float)w / h;
+        y_ratio = 1.0;
+    } else {
+        x_ratio = 1.0;
+        y_ratio = (float)h / w;
+    }
 
     /* for each column */
     for(x = 0; x < w; x++) {
@@ -700,8 +710,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         color = 0x00;
                     } else {
                         if(s->shade[CEILING] & SHADE_PARALLAX) {
-                            wx = (float)x / w * ceiling_dim;
-                            wy = (float)y / h * ceiling_dim;
+                            wx = (float)x / w * x_ratio * ceiling_dim;
+                            wy = (float)y / h * y_ratio * ceiling_dim;
                         } else {
                             wx = v.pos.x + (slope.x * z);
                             wy = v.pos.y + (slope.y * z);
@@ -751,8 +761,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         color = 0x00;
                     } else {
                         if(s->shade[FLOOR] & SHADE_PARALLAX) {
-                            wx = (float)x / w * floor_dim;
-                            wy = (float)y / h * floor_dim;
+                            wx = (float)x / w * x_ratio * floor_dim;
+                            wy = (float)y / h * y_ratio * floor_dim;
                         } else {
                             wx = v.pos.x + (slope.x * z);
                             wy = v.pos.y + (slope.y * z);
@@ -793,7 +803,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 if(line->shade[CEILING] & SHADE_PARALLAX) {
                     /* calculate screen X position relative to texture res */
                     /* TODO: try to calculate based on screen aspect */
-                    wx = (float)x / w * top_line_dim;
+                    wx = (float)x / w * x_ratio * top_line_dim;
                 } else {
                     /* calculate world coordinates */
                     wx = v.pos.x + (slope.x * total_distance);
@@ -807,7 +817,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     y++) {
                     if(line->shade[CEILING] & SHADE_PARALLAX) {
                         /* calculate screen Y position */
-                        wy = (float)y / h * top_line_dim;
+                        wy = (float)y / h * y_ratio * top_line_dim;
                     }
 
                     if(top_line_dim == 0) {
@@ -858,7 +868,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             if(next_y > top) {
                 /* draw top wall */
                 if(line->shade[CEILING] & SHADE_PARALLAX) {
-                    wx = (float)x / w * top_line_dim;
+                    wx = (float)x / w * x_ratio * top_line_dim;
                 } else {
                     wx = v.pos.x + (slope.x * total_distance);
                     wy = v.pos.y + (slope.y * total_distance);
@@ -870,7 +880,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     y <= next_y && y < h;
                     y++) {
                     if(line->shade[CEILING] & SHADE_PARALLAX) {
-                        wy = (float)y / h * top_line_dim;
+                        wy = (float)y / h * y_ratio * top_line_dim;
                     }
 
                     if(top_line_dim == 0) {
@@ -919,7 +929,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 }
 
                 if(line->shade[FLOOR] & SHADE_PARALLAX) {
-                    wx = (float)x / w * bottom_line_dim;
+                    wx = (float)x / w * x_ratio * bottom_line_dim;
                 } else {
                     wx = v.pos.x + (slope.x * total_distance);
                     wy = v.pos.y + (slope.y * total_distance);
@@ -931,7 +941,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     y >= next_y && y >= 0;
                     y--) {
                     if(line->shade[FLOOR] & SHADE_PARALLAX) {
-                        wy = (float)y / h * bottom_line_dim;
+                        wy = (float)y / h * y_ratio * bottom_line_dim;
                     }
 
                     if(bottom_line_dim == 0) {
