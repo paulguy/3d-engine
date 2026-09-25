@@ -326,69 +326,105 @@ class Texture:
         return texture.texture, token
 
 @dataclass(frozen=True)
-class Line:
-    point : int
-    textures : tuple[int, int]
-    shade : tuple[int, int]
-    texture_bias : tuple[int, int]
-    texture_transform : tuple[int, int]
+class Wall:
+    texture : int
+    shade : int
+    bias : int
+    transform : int
 
     storage = []
     named = {}
     aliases = None
 
-    STRUCT = struct.Struct("<HBBHHHHHH")
+    STRUCT = struct.Struct("<BHHH")
 
     def __str__(self):
-        return f"Start Point {self.point}  " \
-               f"Top Texture {self.textures[0]} {shade_str(self.shade[0])} {self.texture_bias[0]} {self.texture_transform[0]}  " \
-               f"Bottom Texture {self.textures[1]} {shade_str(self.shade[1])} {self.texture_bias[1]} {self.texture_transform[1]}"
+        return f"Wall {self.texture} {shade_str(self.shade)} {self.bias} {self.transform}  " \
 
     def serialize(self):
-        return Line.STRUCT.pack(self.point,
-                                self.textures[0], self.textures[1],
-                                self.shade[0], self.shade[1],
-                                self.texture_bias[0], self.texture_bias[1],
-                                self.texture_transform[0], self.texture_transform[1])
+        return Wall.STRUCT.pack(self.texture, self.shade, self.bias, self.transform)
+
+    def parse(tokens : list[str], token : int) -> tuple[Line, int]:
+        texture : int
+        shade : int
+        bias : int
+        transform : int
+ 
+        texture, token = get_named(Texture, tokens, token, "texture", get_index=True)
+        shade, token = parse_shade(tokens, token)
+        bias, token = get_named(Point, tokens, token, "texture bias", get_index=True)
+        transform, token = get_named(Matrix3x2, tokens, token, "texture transform", get_index=True)
+
+        return Wall(texture, shade, bias, transform), token
+
+@dataclass(frozen=True)
+class Line:
+    point : int
+    wall : tuple[int, int]
+
+    storage = []
+    named = {}
+    aliases = None
+
+    STRUCT = struct.Struct("<HHH")
+
+    def __str__(self):
+        return f"Start Point {self.point}  Top {self.wall[0]}  Bottom {self.wall[1]}"
+
+    def serialize(self):
+        return Line.STRUCT.pack(self.point, self.wall[0], self.wall[1])
 
     @staticmethod
     def parse(tokens : list[str], token : int) -> tuple[Line, int]:
         point : int
-        # TODO: store wall texture info in its own class and write it to its own list in the file and refer to it by int
-        texture1 : int
-        texture2 : int
-        shade1 : tuple[int]
-        shade2 : tuple[int]
-        texture_bias1 : int
-        texture_bias2 : int
-        texture_transform1 : int
-        texture_transform2 : int
+        wall1 : int
+        wall2 : int
 
         point, token = get_named(Point, tokens, token, "point", get_index=True)
 
-        texture1, token = get_named(Texture, tokens, token, "texture", get_index=True)
-        shade1, token = parse_shade(tokens, token)
-        texture_bias1, token = get_named(Point, tokens, token, "texture bias", get_index=True)
-        texture_transform1, token = get_named(Matrix3x2, tokens, token, "texture transform", get_index=True)
-
-        texture2, token = get_named(Texture, tokens, token, "texture", get_index=True)
-        shade2, token = parse_shade(tokens, token)
-        texture_bias2, token = get_named(Point, tokens, token, "texture bias", get_index=True)
-        texture_transform2, token = get_named(Matrix3x2, tokens, token, "texture transform", get_index=True)
+        wall1, token = get_named(Wall, tokens, token, "top wall", get_index=True)
+        wall2, token = get_named(Wall, tokens, token, "bottom wall", get_index=True)
 
         return Line(point,
-                    (texture1, texture2),
-                    (shade1, shade2),
-                    (texture_bias1, texture_bias2),
-                    (texture_transform1, texture_transform2)), token
+                    (wall1, wall2)), token
+
+@dataclass(frozen=True)
+class Flat:
+    # pretty much Wall but it needs a matrix2x2
+    texture : int
+    shade : int
+    bias : int
+    transform :int
+
+    storage = []
+    named = {}
+    aliases = None
+
+    STRUCT = struct.Struct("<BHHH")
+
+    def __str__(self):
+        return f"Flat {self.texture} {shade_str(self.shade)} {self.bias} {self.transform}  " \
+
+    def serialize(self):
+        return Flat.STRUCT.pack(self.texture, self.shade, self.bias, self.transform)
+
+    def parse(tokens : list[str], token : int) -> tuple[Line, int]:
+        texture : int
+        shade : int
+        bias : int
+        transform : int
+ 
+        texture, token = get_named(Texture, tokens, token, "texture", get_index=True)
+        shade, token = parse_shade(tokens, token)
+        bias, token = get_named(Point, tokens, token, "texture bias", get_index=True)
+        transform, token = get_named(Matrix2x2, tokens, token, "texture transform", get_index=True)
+
+        return Wall(texture, shade, bias, transform), token
 
 @dataclass(frozen=True)
 class Sector:
     height : tuple[float, float]
-    textures : tuple[int, int]
-    shade : tuple[int, int]
-    texture_bias : tuple[int, int]
-    texture_transform : tuple[int, int]
+    flat : tuple[int, int]
     firstline : int
     lines : int
     action : int
@@ -397,20 +433,17 @@ class Sector:
     named = {}
     aliases = None
 
-    STRUCT = struct.Struct("<ffBBHHHHHHHBI")
+    STRUCT = struct.Struct("<ffHHHBI")
 
     def serialize(self):
         return Sector.STRUCT.pack(self.height[0], self.height[1],
-                                  self.textures[0], self.textures[1],
-                                  self.shade[0], self.shade[1],
-                                  self.texture_bias[0], self.texture_bias[1],
-                                  self.texture_transform[0], self.texture_transform[1],
+                                  self.flat[0], self.flat[1],
                                   self.firstline, self.lines - 3,
                                   self.action)
 
     def __str__(self):
-        return f"Ceiling Height {self.height[0]}  Ceiling Texture {self.textures[0]} {shade_str(self.shade[0])} {self.texture_bias[0]} {self.texture_transform[0]}  " \
-               f"Floor Height {self.height[1]}  Floor Texture {self.textures[1]} {shade_str(self.shade[1])} {self.texture_bias[1]} {self.texture_transform[1]}  " \
+        return f"Ceiling Height {self.height[0]}  Ceiling {self.flat[0]}  " \
+               f"Floor Height {self.height[1]}  Floor {self.flat[1]}  " \
                f"First Line {self.firstline}  Lines {self.lines}  " \
                f"Action {action_str(self.action)}"
 
@@ -418,15 +451,8 @@ class Sector:
     def parse(tokens : list[str], token : int) -> tuple[Sector, int]:
         nexttoken : int
         height : tuple[float, float]
-        # TODO probably store these too
-        texture1 : int
-        texture2 : int
-        shade1 : tuple(int)
-        shade2 : tuple(int)
-        texture_bias1 : int
-        texture_bias2 : int
-        texture_transform1 : int
-        texture_transform2 : int
+        flat1 : int
+        flat2 : int
         linecount : int
         action : int
 
@@ -435,15 +461,8 @@ class Sector:
 
         height, token = get_multi(tuple, (float, float), tokens, token, "Height")
 
-        texture1, token = get_named(Texture, tokens, token, "texture", get_index=True)
-        shade1, token = parse_shade(tokens, token)
-        texture_bias1, token = get_named(Point, tokens, token, "texture bias", get_index=True)
-        texture_transform1, token = get_named(Matrix2x2, tokens, token, "texture transform", get_index=True)
-
-        texture2, token = get_named(Texture, tokens, token, "texture", get_index=True)
-        shade2, token = parse_shade(tokens, token)
-        texture_bias2, token = get_named(Point, tokens, token, "texture bias", get_index=True)
-        texture_transform2, token = get_named(Matrix2x2, tokens, token, "texture transform", get_index=True)
+        flat1, token = get_named(Flat, tokens, token, "ceiling flat", get_index=True)
+        flat2, token = get_named(Flat, tokens, token, "floor flat", get_index=True)
 
         line, token = get_named(Line, tokens, token, "first line", get_index=True)
         linecount, token = get_single(int, tokens, token, "line count")
@@ -465,10 +484,7 @@ class Sector:
         action, token = parse_action(tokens, token)
 
         return Sector(height,
-                      (texture1, texture2),
-                      (shade1, shade2),
-                      (texture_bias1, texture_bias2),
-                      (texture_transform1, texture_transform2),
+                      (flat1, flat2),
                       line, linecount, action), token
 
 @dataclass(frozen=True)
@@ -587,7 +603,9 @@ types : dict[str, Type] = {
     'matrix2x2': Matrix2x2,
     'matrix3x2': Matrix3x2,
     'texture': Texture,
+    'wall': Wall,
     'line': Line,
+    'flat': Flat,
     'sector': Sector,
     'link': Link,
     'view': View
@@ -596,7 +614,7 @@ types : dict[str, Type] = {
 def main():
     global linenum
 
-    HDR_STRUCT = struct.Struct("<HHHHHHH")
+    HDR_STRUCT = struct.Struct("<HHHHHHHHH")
 
     outpath = pathlib.Path(sys.argv[1])
     outpath = outpath.parent / (outpath.stem + '.bin')
@@ -711,14 +729,18 @@ def main():
         print(f"Points {len(Point.storage)}  " \
               f"Matrix2x2s {len(Matrix2x2.storage)}  " \
               f"Matrix3x2s {len(Matrix3x2.storage)}  " \
+              f"Walls {len(Wall.storage)}  " \
               f"Lines {len(Line.storage)}  " \
+              f"Flats {len(Flat.storage)}  " \
               f"Sectors {len(Sector.storage)}  " \
               f"Links {len(Link.storage)}  " \
               f"Views {len(View.storage)}")
         outfile.write(HDR_STRUCT.pack(len(Point.storage),
                                       len(Matrix2x2.storage),
                                       len(Matrix3x2.storage),
+                                      len(Wall.storage),
                                       len(Line.storage),
+                                      len(Flat.storage),
                                       len(Sector.storage),
                                       len(Link.storage),
                                       len(View.storage)))
@@ -735,9 +757,17 @@ def main():
             print(n, matrix3x2)
             outfile.write(matrix3x2.serialize())
 
+        for n, wall in enumerate(Wall.storage):
+            print(n, wall)
+            outfile.write(wall.serialize())
+
         for n, line in enumerate(Line.storage):
             print(n, line)
             outfile.write(line.serialize())
+
+        for n, flat in enumerate(Flat.storage):
+            print(n, flat)
+            outfile.write(flat.serialize())
 
         for n, sector in enumerate(Sector.storage):
             print(n, sector)

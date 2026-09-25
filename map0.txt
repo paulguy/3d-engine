@@ -1,8 +1,11 @@
 Texture as solid 0
-Texture as clouds 1
+Texture as sky 1
 Texture as carpet 2
 texture as wallpaper 3
 texture as ceiling 4
+texture as bricks 5
+texture as garage_door 6
+texture as cloudy_sky 7
 
 point as no_scroll 0.0 0.0
 
@@ -11,362 +14,231 @@ Matrix2x2 as floor
 0.0 1.0
 
 Matrix2x2 as sky
-2.0 0.0
-0.0 2.0
+4.0 0.0
+0.0 4.0
 
 Matrix3x2 as north
 1.0 0.0 0.0
 0.0 0.0 1.0
-Matrix3x2 as north_075
-1.0 0.0 0.0
-0.0 0.0 0.75
 Matrix3x2 as northeast
 0.7 -0.7 0.0
 0.0 0.0 1.0
 Matrix3x2 as east
 0.0 -1.0 0.0
 0.0 0.0 1.0
-Matrix3x2 as east_075
-0.0 -1.0 0.0
-0.0 0.0 0.75
+Matrix3x2 as east_wide
+0.0 -0.67 0.0
+0.0 0.0 1.0
 Matrix3x2 as southeast
 -0.7 -0.7 0.0
 0.0 0.0 1.0
 Matrix3x2 as south
 -1.0 0.0 0.0
 0.0 0.0 1.0
-Matrix3x2 as south_075
--1.0 0.0 0.0
-0.0 0.0 0.75
 Matrix3x2 as southwest
 -0.7 0.7 0.0
 0.0 0.0 1.0
 Matrix3x2 as west
 0.0 1.0 0.0
 0.0 0.0 1.0
-Matrix3x2 as west_075
-0.0 1.0 0.0
-0.0 0.0 0.75
+Matrix3x2 as west_wide
+0.0 0.67 0.0
+0.0 0.0 1.0
 Matrix3x2 as northwest
 0.7 0.7 0.0
 0.0 0.0 1.0
 
 Matrix3x2 as sky
-2.0 0.0 0.0
-0.0 2.0 0.0
+4.0 0.0 0.0
+0.0 4.0 0.0
 
-point as hallway1_left -64 -32
-point -64 32
-point -64 96
-point -64 160
-point -64 224
-point -64 288
-point -64 352
-point -64 416
-point -64 480
-point -64 544
+point as row1 -128 -32
+point -128 640
+point 128 640
+point 128 -32
 
-point as hallway1_right 64 -32
-point 64 32
-point 64 96
-point 64 160
-point 64 224
-point 64 288
-point 64 352
-point 64 416
-point 64 480
-point 64 544
+# west is definitely used and it doesn't matter here
+wall as black solid 000 no_scroll west
+wall as metal solid 112 no_scroll west
+wall as bricks bricks sub 110 no_scroll west
 
-point as hallway1_outer 96 32
-point 96 96
-point 96 160
-point 96 224
-point 96 288
-point 96 352
-point 96 416
-point 96 480
+line as row1 row1 metal metal
+line row1+1 metal metal
+line row1+2 metal metal
+line row1+3 metal metal
 
-point as skybox -32 -32
-point 32 -32
-point 32 -64
-point -32 -64
+flat as black solid 000 no_scroll floor
+flat as sky cloudy_sky parallax sub 110 no_scroll sky
+flat as blacktop solid 001 no_scroll floor
 
-line as hallway1_seg1 hallway1_left
-wallpaper sub 112 no_scroll west_075
-solid 000 no_scroll west
-line hallway1_left+1
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+1
-wallpaper sub 112 no_scroll east_075
-solid 000 no_scroll west
-line hallway1_right
-wallpaper sub 112 no_scroll south_075
-solid 000 no_scroll west
-line skybox+1
-solid 000 no_scroll west
-wallpaper sub 110 no_scroll south_075
-line skybox
-wallpaper sub 112 no_scroll south_075
-solid 000 no_scroll west
+sector as row1 104 0 sky blacktop row1 4
 
-Sector as hallway1_seg1 85.3 0
-ceiling sub 222 no_scroll floor
-carpet sub 112 no_scroll floor
-hallway1_seg1 6
+point as door1_scroll -22 0
+wall as garage_door_w1 garage_door sub 110 door1_scroll west_wide
+wall as garage_door_e1 garage_door sub 110 door1_scroll east_wide
+point as door2_scroll 21 0
+wall as garage_door_w2 garage_door sub 110 door2_scroll west_wide
+wall as garage_door_e2 garage_door sub 110 door1_scroll east_wide
+point as door3_scroll 0 0
+wall as garage_door_w3 garage_door sub 110 door3_scroll west_wide
+wall as garage_door_e3 garage_door sub 110 door1_scroll east_wide
+point as door4_scroll 0 0
+wall as garage_door_w4 garage_door sub 110 door4_scroll west_wide
+wall as garage_door_e4 garage_door sub 110 door1_scroll east_wide
 
-line as skybox skybox
-solid 000 no_scroll west
-solid 000 no_scroll west
-line skybox+1
-wallpaper sub 110 no_scroll east_075
-solid 000 no_scroll west
-line skybox+2
-wallpaper sub 110 no_scroll south_075
-solid 000 no_scroll west
-line skybox+3
-wallpaper sub 110 no_scroll west_075
-solid 000 no_scroll west
+point as row1_left -136 -32
+point -136 32
+# door
+point -136 128
+point -136 160
+# door
+point -136 256
+point -136 288
+# door
+point -136 416
+point -136 448
+# door
+point -136 576
+point -136 640
 
-sector as skybox 96 32
-clouds parallax 000 no_scroll sky
-carpet sub 110 no_scroll floor
-skybox 4
+line as row1_left row1_left bricks black
+line row1_left+1 bricks black
+line row1_left+2 bricks black
+line row1_left+3 bricks black
+line row1_left+4 bricks black
+line row1_left+5 bricks black
+line row1_left+6 bricks black
+line row1_left+7 bricks black
+line row1_left+8 bricks black
+line row1_left+9 bricks black
+line row1+1 bricks black
+line row1 bricks black
 
-link hallway1_seg1 hallway1_seg1+4 skybox skybox
+sector as row1_left 96 0 black blacktop row1_left 12
 
-line as hallway1_seg2 hallway1_left+1
-wallpaper sub 001 no_scroll west_075
-solid 000 no_scroll west
-line hallway1_left+2
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+2
-wallpaper sub 112 no_scroll east_075
-solid 000 no_scroll west
-line hallway1_right+1
-solid 000 no_scroll west
-solid 000 no_scroll west
+link row1 row1 row1_left row1_left+10
 
-Sector as hallway1_seg2 85.3 0
-ceiling sub 222 no_scroll floor
-carpet sub 001 no_scroll floor
-hallway1_seg2 4
+point as row1_left_doors -144 32
+point -144 128
+point -144 160
+point -144 256
+point -144 288
+point -144 416
+point -144 448
+point -144 576
 
-line as hallway1_seg3 hallway1_left+2
-wallpaper sub 112 no_scroll west_075
-solid 000 no_scroll west
-line hallway1_left+3
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+3
-wallpaper sub 112 no_scroll east_075
-solid 000 no_scroll west
-line hallway1_right+2
-solid 000 no_scroll west
-solid 000 no_scroll west
+line as row1_left_door1 row1_left_doors garage_door_w1 black
+line row1_left_doors+1 metal black
+line row1_left+2 black black
+line row1_left+1 metal black
 
-Sector as hallway1_seg3 85.3 0
-ceiling sub 222 no_scroll floor
-carpet sub 112 no_scroll floor
-hallway1_seg3 4
+sector as row1_left_door1 64 0 black blacktop row1_left_door1 4
 
-line as hallway1_seg4 hallway1_left+3
-wallpaper sub 001 no_scroll west_075
-solid 000 no_scroll west
-line hallway1_left+4
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+4
-wallpaper sub 112 no_scroll east_075
-solid 000 no_scroll west
-line hallway1_right+3
-solid 000 no_scroll west
-solid 000 no_scroll west
+link row1_left row1_left+1 row1_left_door1 row1_left_door1+2
 
-Sector as hallway1_seg4 85.3 0
-ceiling sub 222 no_scroll floor
-carpet sub 001 no_scroll floor
-hallway1_seg4 4
+line as row1_left_door2 row1_left_doors+2 garage_door_w2 black
+line row1_left_doors+3 metal black
+line row1_left+4 black black
+line row1_left+3 metal black
 
-line as hallway1_seg5 hallway1_left+4
-wallpaper sub 112 no_scroll west_075
-solid 000 no_scroll west
-line hallway1_left+5
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+5
-wallpaper sub 112 no_scroll east_075
-solid 000 no_scroll west
-line hallway1_right+4
-solid 000 no_scroll west
-solid 000 no_scroll west
+sector as row1_left_door2 64 0 black blacktop row1_left_door2 4
 
-Sector as hallway1_seg5 85.3 0
-ceiling sub 222 no_scroll floor
-carpet sub 112 no_scroll floor
-hallway1_seg5 4
+link row1_left row1_left+3 row1_left_door2 row1_left_door2+2
 
-line as hallway1_seg6 hallway1_left+5
-wallpaper sub 001 no_scroll west_075
-solid 000 no_scroll west
-line hallway1_left+6
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+6
-wallpaper sub 112 no_scroll east_075
-solid 000 no_scroll west
-line hallway1_right+5
-solid 000 no_scroll west
-solid 000 no_scroll west
+line as row1_left_door3 row1_left_doors+4 garage_door_w3 black
+line row1_left_doors+5 metal black
+line row1_left+6 black black
+line row1_left+5 metal black
 
-Sector as hallway1_seg6 85.3 0
-ceiling sub 222 no_scroll floor
-carpet sub 001 no_scroll floor
-hallway1_seg6 4
+sector as row1_left_door3 64 0 black blacktop row1_left_door3 4
 
-line as hallway1_seg7 hallway1_left+6
-wallpaper sub 112 no_scroll west_075
-solid 000 no_scroll west
-line hallway1_left+7
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+7
-wallpaper sub 112 no_scroll east_075
-solid 000 no_scroll west
-line hallway1_right+6
-solid 000 no_scroll west
-solid 000 no_scroll west
+link row1_left row1_left+5 row1_left_door3 row1_left_door3+2
 
-Sector as hallway1_seg7 85.3 0
-ceiling sub 222 no_scroll floor
-carpet sub 112 no_scroll floor
-hallway1_seg7 4
+line as row1_left_door4 row1_left_doors+6 garage_door_w4 black
+line row1_left_doors+7 metal black
+line row1_left+8 black black
+line row1_left+7 metal black
 
-line as hallway1_seg8 hallway1_left+7
-wallpaper sub 001 no_scroll west_075
-solid 000 no_scroll west
-line hallway1_left+8
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+8
-wallpaper sub 112 no_scroll east_075
-solid 000 no_scroll west
-line hallway1_right+7
-solid 000 no_scroll west
-solid 000 no_scroll west
+sector as row1_left_door4 64 0 black blacktop row1_left_door4 4
 
-Sector as hallway1_seg8 85.3 0
-ceiling sub 222 no_scroll floor
-carpet sub 001 no_scroll floor
-hallway1_seg8 4
+link row1_left row1_left+7 row1_left_door4 row1_left_door4+2
 
-line as hallway1_seg9 hallway1_left+8
-wallpaper sub 112 no_scroll west_075
-solid 000 no_scroll west
-line hallway1_left+9
-wallpaper sub 112 no_scroll north_075
-solid 000 no_scroll west
-line hallway1_right+9
-wallpaper sub 112 no_scroll east_075
-solid 000 no_scroll west
-line hallway1_right+8
-solid 000 no_scroll west
-solid 000 no_scroll west
+point as row1_right 136 -32
+point 136 32
+# door
+point 136 128
+point 136 160
+# door
+point 136 256
+point 136 288
+# door
+point 136 416
+point 136 448
+# door
+point 136 576
+point 136 640
 
-Sector as hallway1_seg9 85.3 0
-ceiling sub 222 no_scroll floor
-carpet sub 112 no_scroll floor
-hallway1_seg9 4
+line as row1_right row1_right+9 bricks black
+line row1_right+8 bricks black
+line row1_right+7 bricks black
+line row1_right+6 bricks black
+line row1_right+5 bricks black
+line row1_right+4 bricks black
+line row1_right+3 bricks black
+line row1_right+2 bricks black
+line row1_right+1 bricks black
+line row1_right black black
+line row1+3 black black
+line row1+2 black black
 
-link hallway1_seg1 hallway1_seg1+1 hallway1_seg2 hallway1_seg2+3
-link hallway1_seg2 hallway1_seg2+1 hallway1_seg3 hallway1_seg3+3
-link hallway1_seg3 hallway1_seg3+1 hallway1_seg4 hallway1_seg4+3
-link hallway1_seg4 hallway1_seg4+1 hallway1_seg5 hallway1_seg5+3
-link hallway1_seg5 hallway1_seg5+1 hallway1_seg6 hallway1_seg6+3
-link hallway1_seg6 hallway1_seg6+1 hallway1_seg7 hallway1_seg7+3
-link hallway1_seg7 hallway1_seg7+1 hallway1_seg8 hallway1_seg8+3
-link hallway1_seg8 hallway1_seg8+1 hallway1_seg9 hallway1_seg9+3
+sector as row1_right 96 0 black blacktop row1_right 12
 
-line as hallway1_outer1 hallway1_right+1
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+2
-wallpaper sub 001 no_scroll north
-solid 000 no_scroll west
-line hallway1_outer+1
-clouds parallax 000 no_scroll sky
-solid 000 no_scroll west
-line hallway1_outer
-wallpaper sub 001 no_scroll south
-solid 000 no_scroll west
+link row1 row1+2 row1_right row1_right+10
 
-Sector as hallway1_outer1 64 0
-ceiling 000 no_scroll floor
-carpet sub 001 no_scroll floor
-hallway1_outer1 4
+point as row1_right_doors 144 32
+point 144 128
+point 144 160
+point 144 256
+point 144 288
+point 144 416
+point 144 448
+point 144 576
 
-link hallway1_seg2 hallway1_seg2+2 hallway1_outer1 hallway1_outer1
+line as row1_right_door1 row1_right+1 black black
+line row1_right+2 metal black
+line row1_right_doors+1 garage_door_e1 black
+line row1_right_doors metal black
 
-line as hallway1_outer2 hallway1_right+3
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+4
-wallpaper sub 001 no_scroll north
-solid 000 no_scroll west
-line hallway1_outer+3
-clouds parallax 000 no_scroll sky
-solid 000 no_scroll west
-line hallway1_outer+2
-wallpaper sub 001 no_scroll south
-solid 000 no_scroll west
+sector as row1_right_door1 64 0 black blacktop row1_right_door1 4
 
-Sector as hallway1_outer2 64 0
-ceiling 000 no_scroll floor
-carpet sub 001 no_scroll floor
-hallway1_outer2 4
+link row1_right row1_right+7 row1_right_door1 row1_right_door1
 
-link hallway1_seg4 hallway1_seg4+2 hallway1_outer2 hallway1_outer2
+line as row1_right_door2 row1_right+3 black black
+line row1_right+4 metal black
+line row1_right_doors+3 garage_door_e2 black
+line row1_right_doors+2 metal black
 
-line as hallway1_outer3 hallway1_right+5
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+6
-wallpaper sub 001 no_scroll north
-solid 000 no_scroll west
-line hallway1_outer+5
-clouds parallax 000 no_scroll sky
-solid 000 no_scroll west
-line hallway1_outer+4
-wallpaper sub 001 no_scroll south
-solid 000 no_scroll west
+sector as row1_right_door2 64 0 black blacktop row1_right_door2 4
 
-Sector as hallway1_outer3 64 0
-ceiling 000 no_scroll floor
-carpet sub 001 no_scroll floor
-hallway1_outer3 4
+link row1_right row1_right+5 row1_right_door2 row1_right_door2
 
-link hallway1_seg6 hallway1_seg6+2 hallway1_outer3 hallway1_outer3
+line as row1_right_door3 row1_right+5 black black
+line row1_right+6 metal black
+line row1_right_doors+5 garage_door_e3 black
+line row1_right_doors+4 black black
 
-line as hallway1_outer4 hallway1_right+7
-solid 000 no_scroll west
-solid 000 no_scroll west
-line hallway1_right+8
-wallpaper sub 001 no_scroll north
-solid 000 no_scroll west
-line hallway1_outer+7
-clouds parallax 000 no_scroll sky
-solid 000 no_scroll west
-line hallway1_outer+6
-wallpaper sub 001 no_scroll south
-solid 000 no_scroll west
+sector as row1_right_door3 64 0 black blacktop row1_right_door3 4
 
-Sector as hallway1_outer4 64 0
-ceiling 000 no_scroll floor
-carpet sub 001 no_scroll floor
-hallway1_outer4 4
+link row1_right row1_right+3 row1_right_door3 row1_right_door3
 
-link hallway1_seg8 hallway1_seg8+2 hallway1_outer4 hallway1_outer4
+line as row1_right_door4 row1_right+7 black black
+line row1_right+8 metal black
+line row1_right_doors+7 garage_door_e4 black
+line row1_right_doors+6 metal black
+
+sector as row1_right_door4 64 0 black blacktop row1_right_door4 4
+
+link row1_right row1_right+1 row1_right_door4 row1_right_door4
 
 point as view1_start 0 0
-View hallway1_seg1 view1_start 0.0 32.0 60.0
+View row1 view1_start 0.0 32.0 60.0

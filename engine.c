@@ -106,7 +106,9 @@ Point waypoint;
 Point (*p)[] = NULL;
 Matrix2x2 (*m22)[] = NULL;
 Matrix3x2 (*m32)[] = NULL;
+Wall (*w)[] = NULL;
 Line (*l)[] = NULL;
+Flat (*f)[] = NULL;
 Sector (*s)[] = NULL;
 
 open_map_t open_map_p;
@@ -119,7 +121,9 @@ typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
     unsigned short points;
     unsigned short matrix2x2s;
     unsigned short matrix3x2s;
+    unsigned short walls;
     unsigned short lines;
+    unsigned short flats;
     unsigned short sectors;
     unsigned short links;
     unsigned short views;
@@ -140,22 +144,30 @@ typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
 } Matrix3x2_data;
 
 typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    unsigned char texture;
+    unsigned short shade;
+    unsigned short bias;
+    unsigned short transform;
+} Wall_data;
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
     unsigned short point;
     /* sectors are lined by a separate link table */
 
-    unsigned char texture[2];
-    unsigned short shade[2];
-    unsigned short texture_bias[2];
-    unsigned short texture_transform[2];
+    unsigned short wall[2];
 } Line_data;
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    unsigned char texture;
+    unsigned short shade;
+    unsigned short bias;
+    unsigned short transform;
+} Flat_data;
 
 typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
     float height[2];
 
-    unsigned char texture[2];
-    unsigned short shade[2];
-    unsigned short texture_bias[2];
-    unsigned short texture_transform[2];
+    unsigned short flat[2];
 
     unsigned short firstline;
     unsigned char lines;
@@ -183,7 +195,9 @@ typedef union {
     Point_data p;
     Matrix2x2_data m22;
     Matrix3x2_data m32;
+    Wall_data w;
     Line_data l;
+    Flat_data f;
     Sector_data s;
     Link_data li;
     View_data v;
@@ -206,22 +220,26 @@ static void print_data(Header *h) {
         LOG("%d Matrix3x2 %p %f %f %f %f %f %f\n", i, &(*m32)[i], (*m32)[i].xx, (*m32)[i].xy, (*m32)[i].xz, (*m32)[i].yx, (*m32)[i].yy, (*m32)[i].yz);
     }
 
+    for(i = 0; i < h->walls; i++) {
+        LOG("%d Wall %p %hhu %hX %p %p\n", i,
+            &(*w)[i], (*w)[i].texture, (*w)[i].shade, (*w)[i].bias, (*w)[i].transform);
+    }
+
     for(i = 0; i < h->lines; i++) {
-        LOG("%d Line %p %p %p %hu %hu %hX %hX %p %p %p %p\n", i,
+        LOG("%d Line %p %p %p %p %p\n", i,
             &(*l)[i], (*l)[i].point, (*l)[i].sector,
-            (*l)[i].texture[CEILING], (*l)[i].texture[FLOOR],
-            (*l)[i].shade[CEILING], (*l)[i].shade[FLOOR],
-            (*l)[i].texture_bias[CEILING], (*l)[i].texture_bias[FLOOR],
-            (*l)[i].texture_transform[CEILING], (*l)[i].texture_transform[FLOOR]);
+            (*l)[i].wall[CEILING], (*l)[i].wall[FLOOR]);
+    }
+
+    for(i = 0; i < h->flats; i++) {
+        LOG("%d Wall %p %hhu %hX %p %p\n", i,
+            &(*f)[i], (*f)[i].texture, (*f)[i].shade, (*f)[i].bias, (*f)[i].transform);
     }
 
     for(i = 0; i < h->sectors; i++) {
-        LOG("%d Sector %p %f %f %hu %hu %hX %hX %p %p %p %p %p %hhu ", i,
+        LOG("%d Sector %p %f %f %p %p %p %hhu ", i,
             &(*s)[i], (*s)[i].height[CEILING], (*s)[i].height[FLOOR],
-            (*s)[i].texture[CEILING], (*s)[i].texture[FLOOR],
-            (*s)[i].shade[CEILING], (*s)[i].shade[FLOOR],
-            (*s)[i].texture_bias[CEILING], (*s)[i].texture_bias[FLOOR],
-            (*s)[i].texture_transform[CEILING], (*s)[i].texture_transform[FLOOR],
+            (*s)[i].flat[CEILING], (*s)[i].flat[FLOOR],
             (*s)[i].firstline, (*s)[i].lines);
         switch((*s)[i].action & 0xFF) {
             case ACTION_NONE:
@@ -268,7 +286,9 @@ int engine_load(unsigned char number, unsigned char view) {
 
     if(p != NULL) {
         free(s);
+        free(f);
         free(l);
+        free(w);
         free(m32);
         free(m22);
         free(p);
@@ -302,14 +322,24 @@ int engine_load(unsigned char number, unsigned char view) {
         goto error_m22s;
     }
 
+    w = malloc(h.walls * sizeof(Wall));
+    if(w == NULL) {
+        goto error_m32s;
+    }
+
     l = malloc(h.lines * sizeof(Line));
     if(l == NULL) {
-        goto error_m32s;
+        goto error_walls;
+    }
+
+    f = malloc(h.flats * sizeof(Flat));
+    if(f == NULL) {
+        goto error_lines;
     }
 
     s = malloc(h.sectors * sizeof(Sector));
     if(s == NULL) {
-        goto error_lines;
+        goto error_flats;
     }
 
     start += sizeof(Header);
@@ -340,35 +370,41 @@ int engine_load(unsigned char number, unsigned char view) {
     }
 
     start += sizeof(Matrix3x2_data) * h.matrix3x2s;
+    for(i = 0; i < h.walls; i++) {
+        read_map_p(start + (i * sizeof(Wall_data)), sizeof(Wall_data), &d.w);
+        (*w)[i].texture = d.w.texture;
+        (*w)[i].shade = d.w.shade;
+        (*w)[i].bias = &(*p)[d.w.bias];
+        (*w)[i].transform = &(*m32)[d.w.transform];
+    }
+
+    start += sizeof(Wall_data) * h.walls;
     for(i = 0; i < h.lines; i++) {
         read_map_p(start + (i * sizeof(Line_data)), sizeof(Line_data), &d.l);
         (*l)[i].point = &(*p)[d.l.point];
         /* sector will be filled when links are read */
         (*l)[i].sector = NULL;
-        (*l)[i].texture[CEILING] = d.l.texture[CEILING];
-        (*l)[i].texture[FLOOR] = d.l.texture[FLOOR];
-        (*l)[i].shade[CEILING] = d.l.shade[CEILING];
-        (*l)[i].shade[FLOOR] = d.l.shade[FLOOR];
-        (*l)[i].texture_bias[CEILING] = &(*p)[d.l.texture_bias[CEILING]];
-        (*l)[i].texture_bias[FLOOR] = &(*p)[d.l.texture_bias[FLOOR]];
-        (*l)[i].texture_transform[CEILING] = &(*m32)[d.l.texture_transform[CEILING]];
-        (*l)[i].texture_transform[FLOOR] = &(*m32)[d.l.texture_transform[FLOOR]];
+        (*l)[i].wall[CEILING] = &(*w)[d.l.wall[CEILING]];
+        (*l)[i].wall[FLOOR] = &(*w)[d.l.wall[FLOOR]];
     }
 
     start += sizeof(Line_data) * h.lines;
+    for(i = 0; i < h.flats; i++) {
+        read_map_p(start + (i * sizeof(Flat_data)), sizeof(Flat_data), &d.f);
+        (*f)[i].texture = d.f.texture;
+        (*f)[i].shade = d.f.shade;
+        (*f)[i].bias = &(*p)[d.f.bias];
+        (*f)[i].transform = &(*m22)[d.f.transform];
+    }
+
+    start += sizeof(Flat_data) * h.flats;
     for(i = 0; i < h.sectors; i++) {
         read_map_p(start + (i * sizeof(Sector_data)), sizeof(Sector_data), &d.s);
         d.s.lines += 3; /* 3 lines minimum so 0 is 3 mines */
         (*s)[i].height[CEILING] = d.s.height[CEILING];
         (*s)[i].height[FLOOR] = d.s.height[FLOOR];
-        (*s)[i].texture[CEILING] = d.s.texture[CEILING];
-        (*s)[i].texture[FLOOR] = d.s.texture[FLOOR];
-        (*s)[i].shade[CEILING] = d.s.shade[CEILING];
-        (*s)[i].shade[FLOOR] = d.s.shade[FLOOR];
-        (*s)[i].texture_bias[CEILING] = &(*p)[d.s.texture_bias[CEILING]];
-        (*s)[i].texture_bias[FLOOR] = &(*p)[d.s.texture_bias[FLOOR]];
-        (*s)[i].texture_transform[CEILING] = &(*m22)[d.s.texture_transform[CEILING]];
-        (*s)[i].texture_transform[FLOOR] = &(*m22)[d.s.texture_transform[FLOOR]];
+        (*s)[i].flat[CEILING] = &(*f)[d.s.flat[CEILING]];
+        (*s)[i].flat[FLOOR] = &(*f)[d.s.flat[FLOOR]];
         (*s)[i].firstline = &(*l)[d.s.firstline];
         (*s)[i].lines = d.s.lines;
         (*s)[i].action = d.s.action;
@@ -394,17 +430,21 @@ int engine_load(unsigned char number, unsigned char view) {
     LOG("Post-load %d bytes\n", heap_bytes_free());
 #else
     print_data(&h);
-    LOG("Memory in bytes - Points %d Matrix2x2s %d Matrix3x2s %d Lines %d Sectors %d Total %d\n",
-         h.points * sizeof(Point), h.matrix2x2s * sizeof(Matrix2x2), h.matrix3x2s * sizeof(Matrix3x2), h.lines * sizeof(Line), h.sectors * sizeof(Sector),
-        (h.points * sizeof(Point)) + (h.matrix2x2s * sizeof(Matrix2x2)) + (h.matrix3x2s * sizeof(Matrix3x2)) + (h.lines * sizeof(Line)) + (h.sectors * sizeof(Sector)));
+    LOG("Memory in bytes - Points %d Matrix2x2s %d Matrix3x2s %d Walls %d Lines %d Flats %d Sectors %d Total %d\n",
+         h.points * sizeof(Point), h.matrix2x2s * sizeof(Matrix2x2), h.matrix3x2s * sizeof(Matrix3x2), h.walls * sizeof(Wall), h.lines * sizeof(Line),h.flats * sizeof(Flat), h.sectors * sizeof(Sector),
+        (h.points * sizeof(Point)) + (h.matrix2x2s * sizeof(Matrix2x2)) + (h.matrix3x2s * sizeof(Matrix3x2)) + (h.walls * sizeof(Wall)) + (h.lines * sizeof(Line)) + (h.flats * sizeof(Flat)) + (h.sectors * sizeof(Sector)));
 #endif
 
     mapnum = number;
 
     return(0);
 
+error_flats:
+    free(f);
 error_lines:
     free(l);
+error_walls:
+    free(w);
 error_m32s:
     free(m32);
 error_m22s:
@@ -623,9 +663,10 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     unsigned char bottom_line_mask = 0;
     unsigned char *bottom_line_data = NULL;
     unsigned short color;
-    Point *texture_bias;
-    Matrix2x2 *texture_transform_22;
-    Matrix3x2 *texture_transform_32;
+    Point *bias;
+    Matrix2x2 *transform22;
+    Matrix3x2 *transform32;
+    unsigned short shade;
     float x_ratio;
     float y_ratio;
 
@@ -693,13 +734,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 /* ceiling is above the view line */
 
                 /* get ceiling texture */
-                if(s->texture[CEILING] != ceiling_tex) {
-                    ceiling_tex = s->texture[CEILING];
+                if(s->flat[CEILING]->texture != ceiling_tex) {
+                    ceiling_tex = s->flat[CEILING]->texture;
                     set_tex(ceiling_tex, &ceiling_data, &ceiling_mask, &ceiling_shift, &ceiling_dim);
                 }
  
-                texture_bias = s->texture_bias[CEILING];
-                texture_transform_22 = s->texture_transform[CEILING];
+                bias = s->flat[CEILING]->bias;
+                transform22 = s->flat[CEILING]->transform;
+                shade = s->flat[CEILING]->shade;
                 for(y = top; y < h_2 && y < bottom; y++) {
                     z = ceilingdiff / ((h_2 - y) / h_2) * max_offset;
 
@@ -709,30 +751,30 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     if(ceiling_dim == 0) {
                         color = 0x00;
                     } else {
-                        if(s->shade[CEILING] & SHADE_PARALLAX) {
+                        if(shade & SHADE_PARALLAX) {
                             wx = (float)x / w * x_ratio * ceiling_dim;
                             wy = (float)y / h * y_ratio * ceiling_dim;
                         } else {
                             wx = v.pos.x + (slope.x * z);
                             wy = v.pos.y + (slope.y * z);
                         }
-                        tx = (wx * texture_transform_22->xx) +
-                             (wy * texture_transform_22->xy) +
-                             texture_bias->x;
-                        ty = (wx * texture_transform_22->yx) +
-                             (wy * texture_transform_22->yy) +
-                             texture_bias->y;
+                        tx = (wx * transform22->xx) +
+                             (wy * transform22->xy) +
+                             bias->x;
+                        ty = (wx * transform22->yx) +
+                             (wy * transform22->yy) +
+                             bias->y;
                         color = ceiling_data[(ty & ceiling_mask) << ceiling_shift | (tx & ceiling_mask)];
                     }
 
-                    if(s->shade[CEILING] & SHADE_SUB) {
+                    if(shade & SHADE_SUB) {
                         color = ~color; /* invert bits */
                         color &= 0xDB; /* unset overflow bits */
-                        color += s->shade[CEILING] & 0xFF; /* add which should subtract when inverted back? */
+                        color += shade & 0xFF; /* add which should subtract when inverted back? */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                         color = ~color; /* invert back */
                     } else {
-                        color += s->shade[CEILING] & 0xFF; /* add */
+                        color += shade & 0xFF; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
 
@@ -744,13 +786,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             /* draw floor */
             floordiff = s->height[FLOOR] - v.height;
             if(floordiff < 0.0) {
-                if(s->texture[FLOOR] != floor_tex) {
-                    floor_tex = s->texture[FLOOR];
+                if(s->flat[FLOOR]->texture != floor_tex) {
+                    floor_tex = s->flat[FLOOR]->texture;
                     set_tex(floor_tex, &floor_data, &floor_mask, &floor_shift, &floor_dim);
                 }
 
-                texture_bias = s->texture_bias[FLOOR];
-                texture_transform_22 = s->texture_transform[FLOOR];
+                bias = s->flat[FLOOR]->bias;
+                transform22 = s->flat[FLOOR]->transform;
+                shade = s->flat[FLOOR]->shade;
                 for(y = bottom; y >= 0 && y >= top; y--) {
                     z = floordiff / ((h_2 - y) / h_2) * max_offset;
 
@@ -760,29 +803,29 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     if(floor_dim == 0) {
                         color = 0x00;
                     } else {
-                        if(s->shade[FLOOR] & SHADE_PARALLAX) {
+                        if(shade & SHADE_PARALLAX) {
                             wx = (float)x / w * x_ratio * floor_dim;
                             wy = (float)y / h * y_ratio * floor_dim;
                         } else {
                             wx = v.pos.x + (slope.x * z);
                             wy = v.pos.y + (slope.y * z);
                         }
-                        tx = (wx * texture_transform_22->xx) +
-                             (wy * texture_transform_22->xy) +
-                             texture_bias->x;
-                        ty = (wx * texture_transform_22->yx) +
-                             (wy * texture_transform_22->yy) +
-                             texture_bias->y;
+                        tx = (wx * transform22->xx) +
+                             (wy * transform22->xy) +
+                             bias->x;
+                        ty = (wx * transform22->yx) +
+                             (wy * transform22->yy) +
+                             bias->y;
                         color = floor_data[(ty & floor_mask) << floor_shift | (tx & floor_mask)];
                     }
-                    if(s->shade[FLOOR] & SHADE_SUB) {
+                    if(shade & SHADE_SUB) {
                         color = ~color; /* invert bits */
                         color &= 0xDB; /* unset overflow bits */
-                        color += s->shade[FLOOR] & 0xFF; /* add which should subtract when inverted back? */
+                        color += shade & 0xFF; /* add which should subtract when inverted back? */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                         color = ~color; /* invert back */
                     } else {
-                        color += s->shade[FLOOR] & 0xFF; /* add */
+                        color += shade & 0xFF; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
@@ -790,17 +833,20 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 bottom = y;
             }
 
-            /* get top wall texture as this'll most likely be needed */
-            if(line->texture[CEILING] != top_line_tex) {
-                top_line_tex = line->texture[CEILING];
+            /* get top wall texture parameters as these'll most likely be needed */
+            if(line->wall[CEILING]->texture != top_line_tex) {
+                top_line_tex = line->wall[CEILING]->texture;
                 set_tex(top_line_tex, &top_line_data, &top_line_mask, &top_line_shift, &top_line_dim);
             }
+            bias = line->wall[CEILING]->bias;
+            transform32 = line->wall[CEILING]->transform;
+            shade = line->wall[CEILING]->shade;
 
             if(line->sector == NULL) {
                 /* solid wall, no sector on the other side */
     
                 /* draw wall */
-                if(line->shade[CEILING] & SHADE_PARALLAX) {
+                if(shade & SHADE_PARALLAX) {
                     /* calculate screen X position relative to texture res */
                     /* TODO: try to calculate based on screen aspect */
                     wx = (float)x / w * x_ratio * top_line_dim;
@@ -810,12 +856,10 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     wy = v.pos.y + (slope.y * total_distance);
                 }
 
-                texture_bias = line->texture_bias[CEILING];
-                texture_transform_32 = line->texture_transform[CEILING];
                 for(y = top;
                     y <= bottom && y < h;
                     y++) {
-                    if(line->shade[CEILING] & SHADE_PARALLAX) {
+                    if(shade & SHADE_PARALLAX) {
                         /* calculate screen Y position */
                         wy = (float)y / h * y_ratio * top_line_dim;
                     }
@@ -823,7 +867,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     if(top_line_dim == 0) {
                         color = 0x00;
                     } else {
-                        if(line->shade[CEILING] & SHADE_PARALLAX) {
+                        if(shade & SHADE_PARALLAX) {
                             wz = 0.0;
                         } else {
                             /* calculate height */
@@ -831,27 +875,27 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         }
 
                         /* calculate translated texcoords */
-                        tx = (wx * texture_transform_32->xx) +
-                             (wy * texture_transform_32->xy) +
-                             (wz * texture_transform_32->xz) +
-                             texture_bias->x;
-                        ty = (wx * texture_transform_32->yx) +
-                             (wy * texture_transform_32->yy) +
-                             (wz * texture_transform_32->yz) +
-                             texture_bias->y;
+                        tx = (wx * transform32->xx) +
+                             (wy * transform32->xy) +
+                             (wz * transform32->xz) +
+                             bias->x;
+                        ty = (wx * transform32->yx) +
+                             (wy * transform32->yy) +
+                             (wz * transform32->yz) +
+                             bias->y;
 
                         /* fetch tex color */
                         color = top_line_data[(ty & top_line_mask) << top_line_shift | (tx & top_line_mask)];
                     }
 
-                    if(line->shade[CEILING] & SHADE_SUB) {
+                    if(shade & SHADE_SUB) {
                         color = ~color; /* invert bits */
                         color &= 0xDB; /* unset overflow bits */
-                        color += line->shade[CEILING] & 0xFF; /* add which should subtract when inverted back? */
+                        color += shade & 0xFF; /* add which should subtract when inverted back? */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                         color = ~color; /* invert back */
                     } else {
-                        color += line->shade[CEILING] & 0xFF; /* add */
+                        color += shade & 0xFF; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
@@ -863,54 +907,52 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             last_s = s;
             s = line->sector;
 
-            ceilingdiff = s->height[0] - v.height;
+            ceilingdiff = s->height[CEILING] - v.height;
             next_y = h_2 - (ceilingdiff / total_distance * max_offset * h_2);
             if(next_y > top) {
                 /* draw top wall */
-                if(line->shade[CEILING] & SHADE_PARALLAX) {
+                if(shade & SHADE_PARALLAX) {
                     wx = (float)x / w * x_ratio * top_line_dim;
                 } else {
                     wx = v.pos.x + (slope.x * total_distance);
                     wy = v.pos.y + (slope.y * total_distance);
                 }
 
-                texture_bias = line->texture_bias[0];
-                texture_transform_32 = line->texture_transform[0];
                 for(y = top;
                     y <= next_y && y < h;
                     y++) {
-                    if(line->shade[CEILING] & SHADE_PARALLAX) {
+                    if(shade & SHADE_PARALLAX) {
                         wy = (float)y / h * y_ratio * top_line_dim;
                     }
 
                     if(top_line_dim == 0) {
                         color = 0x00;
                     } else {
-                        if(line->shade[CEILING] & SHADE_PARALLAX) {
+                        if(shade & SHADE_PARALLAX) {
                             wz = 0.0;
                         } else {
                             wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
                         }
 
-                        tx = (wx * texture_transform_32->xx) +
-                             (wy * texture_transform_32->xy) +
-                             (wz * texture_transform_32->xz) +
-                             texture_bias->x;
-                        ty = (wx * texture_transform_32->yx) +
-                             (wy * texture_transform_32->yy) +
-                             (wz * texture_transform_32->yz) +
-                             texture_bias->y;
+                        tx = (wx * transform32->xx) +
+                             (wy * transform32->xy) +
+                             (wz * transform32->xz) +
+                             bias->x;
+                        ty = (wx * transform32->yx) +
+                             (wy * transform32->yy) +
+                             (wz * transform32->yz) +
+                             bias->y;
                         color = top_line_data[(ty & top_line_mask) << top_line_shift | (tx & top_line_mask)];
                     }
 
-                    if(line->shade[CEILING] & SHADE_SUB) {
+                    if(shade & SHADE_SUB) {
                         color = ~color; /* invert bits */
                         color &= 0xDB; /* unset overflow bits */
-                        color += line->shade[CEILING] & 0xFF; /* add which should subtract when inverted back? */
+                        color += shade & 0xFF; /* add which should subtract when inverted back? */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                         color = ~color; /* invert back */
                     } else {
-                        color += line->shade[CEILING] & 0xFF; /* add */
+                        color += shade & 0xFF; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
@@ -923,55 +965,56 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             next_y = h_2 - (floordiff / total_distance * max_offset * h_2);
             if(next_y < bottom) {
                 /* bottom wall texture will be needed */
-                if(line->texture[FLOOR] != bottom_line_tex) {
-                    bottom_line_tex = line->texture[FLOOR];
+                if(line->wall[FLOOR]->texture != bottom_line_tex) {
+                    bottom_line_tex = line->wall[FLOOR]->texture;
                     set_tex(bottom_line_tex, &bottom_line_data, &bottom_line_mask, &bottom_line_shift, &bottom_line_dim);
                 }
+                bias = line->wall[FLOOR]->bias;
+                transform32 = line->wall[FLOOR]->transform;
+                shade = line->wall[FLOOR]->shade;
 
-                if(line->shade[FLOOR] & SHADE_PARALLAX) {
+                if(shade & SHADE_PARALLAX) {
                     wx = (float)x / w * x_ratio * bottom_line_dim;
                 } else {
                     wx = v.pos.x + (slope.x * total_distance);
                     wy = v.pos.y + (slope.y * total_distance);
                 }
 
-                texture_bias = line->texture_bias[FLOOR];
-                texture_transform_32 = line->texture_transform[FLOOR];
                 for(y = bottom;
                     y >= next_y && y >= 0;
                     y--) {
-                    if(line->shade[FLOOR] & SHADE_PARALLAX) {
+                    if(shade & SHADE_PARALLAX) {
                         wy = (float)y / h * y_ratio * bottom_line_dim;
                     }
 
                     if(bottom_line_dim == 0) {
                         color = 0x00;
                     } else {
-                        if(line->shade[FLOOR] & SHADE_PARALLAX) {
+                        if(shade & SHADE_PARALLAX) {
                             wz = 0.0;
                         } else {
                             wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
                         }
 
-                        tx = (wx * texture_transform_32->xx) +
-                             (wy * texture_transform_32->xy) +
-                             (wz * texture_transform_32->xz) +
-                             texture_bias->x;
-                        ty = (wx * texture_transform_32->yx) +
-                             (wy * texture_transform_32->yy) +
-                             (wz * texture_transform_32->yz) +
-                             texture_bias->y;
+                        tx = (wx * transform32->xx) +
+                             (wy * transform32->xy) +
+                             (wz * transform32->xz) +
+                             bias->x;
+                        ty = (wx * transform32->yx) +
+                             (wy * transform32->yy) +
+                             (wz * transform32->yz) +
+                             bias->y;
                         color = bottom_line_data[(ty & bottom_line_mask) << bottom_line_shift | (tx & bottom_line_mask)];
                     }
 
-                    if(line->shade[FLOOR] & SHADE_SUB) {
+                    if(shade & SHADE_SUB) {
                         color = ~color; /* invert bits */
                         color &= 0xDB; /* unset overflow bits */
-                        color += line->shade[FLOOR] & 0xFF; /* add which should subtract when inverted back? */
+                        color += shade & 0xFF; /* add which should subtract when inverted back? */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                         color = ~color; /* invert back */
                     } else {
-                        color += line->shade[FLOOR] & 0xFF; /* add */
+                        color += shade & 0xFF; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */

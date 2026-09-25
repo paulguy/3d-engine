@@ -38,15 +38,26 @@ typedef struct {
 typedef struct Sector_s Sector;
 typedef struct Line_s Line;
 
+typedef struct {
+    unsigned char texture;
+    unsigned short shade;
+    Point *bias;
+    Matrix3x2 *transform;
+} Wall;
+
 typedef struct Line_s {
     Point *point;
     Sector *sector;
 
-    unsigned char texture[2];
-    unsigned short shade[2];
-    Point *texture_bias[2];
-    Matrix3x2 *texture_transform[2];
+    Wall *wall[2];
 } Line;
+
+typedef struct {
+    unsigned char texture;
+    unsigned short shade;
+    Point *bias;
+    Matrix2x2 *transform;
+} Flat;
 
 typedef struct Sector_s {
     Line *firstline;
@@ -54,10 +65,7 @@ typedef struct Sector_s {
 
     float height[2];
 
-    unsigned char texture[2];
-    unsigned short shade[2];
-    Point *texture_bias[2];
-    Matrix2x2 *texture_transform[2];
+    Flat *flat[2];
 
     unsigned int action;
 } Sector;
