@@ -472,12 +472,12 @@ class Sector:
             raise ValueError(f"{linenum}: Lines {line} - {line + linecount} goes past end of lines list ({len(Line.storage)}).")
         # duplicate points on a sector wall breaks rendering?
         # might catch some mistakes too.
-        for i in range(linecount):
-            for j in range(linecount - i - 1):
+        for i in range(linecount - 1):
+            point1 = Point.storage[Line.storage[line+i].point]
+            for j in range(i + 1, linecount):
                 # the points themselves shouldn't need to be compared, but at least 1 needs to be fetched anyway
                 # to print the point coordinates
-                point1 = Point.storage[Point.aliases[Line.storage[line+i].point]]
-                point2 = Point.storage[Point.aliases[Line.storage[line+i+1+j].point]]
+                point2 = Point.storage[Line.storage[line+j].point]
                 if point1 == point2:
                     warn(f"Lines {i} and {j} share a point {point1.x}, {point1.y}.")
 
