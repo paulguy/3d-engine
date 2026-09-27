@@ -286,13 +286,22 @@ void select_click_handler(ClickRecognizerRef recognizer, void *context) {
     layer_mark_dirty(s_engine_layer);
 }
 
+float clamp_angle(float angle) {
+    if(angle < 0.0) {
+        angle += M_PI * 2.0;
+    } else if(angle >= M_PI * 2.0) {
+        angle -= M_PI * 2.0;
+    }
+    return angle;
+}
+
 void up_click_handler(ClickRecognizerRef recognizer, void *context) {
-    v.angle -= M_PI * 0.1;
+    v.angle = clamp_angle(v.angle - (M_PI * 0.1));
     layer_mark_dirty(s_engine_layer);
 }
 
 void down_click_handler(ClickRecognizerRef recognizer, void *context) {
-    v.angle += M_PI * 0.1;
+    v.angle = clamp_angle(v.angle + (M_PI * 0.1));
     layer_mark_dirty(s_engine_layer);
 }
 

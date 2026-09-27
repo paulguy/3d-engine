@@ -663,12 +663,11 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     unsigned char bottom_line_mask = 0;
     unsigned char *bottom_line_data = NULL;
     unsigned short color;
-    Point *bias;
+    Point bias;
     Matrix2x2 *transform22;
     Matrix3x2 *transform32;
     unsigned short shade;
     float x_ratio;
-    float y_ratio;
 
     float w_2 = (float)w / 2.0;
     float h_2 = (float)h / 2.0;
@@ -676,16 +675,12 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     float sin_angle = sin(v.angle);
     float cos_angle = cos(v.angle);
     float max_offset = atan2f(fov_2, 1.0) * 2.0;
+    float bg_pan = v.angle / (M_PI * 2.0);
 
     age_slots();
 
-    if(w > h) {
-        x_ratio = (float)w / h;
-        y_ratio = 1.0;
-    } else {
-        x_ratio = 1.0;
-        y_ratio = (float)h / w;
-    }
+    /* scale horizontally to keep parallax texture pixels square */
+    x_ratio = (float)w / h;
 
     /* for each column */
     for(x = 0; x < w; x++) {
@@ -739,9 +734,15 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     set_tex(ceiling_tex, &ceiling_data, &ceiling_mask, &ceiling_shift, &ceiling_dim);
                 }
  
-                bias = s->flat[CEILING]->bias;
+                bias.x = s->flat[CEILING]->bias->x;
+                bias.y = s->flat[CEILING]->bias->y;
                 transform22 = s->flat[CEILING]->transform;
                 shade = s->flat[CEILING]->shade;
+                if(shade & SHADE_PARALLAX) {
+                    wx = (float)x / w * x_ratio * ceiling_dim;
+                    /* apply panning with maybe appropriate scale parameters? */
+                    bias.x += (bg_pan * ceiling_dim * transform22->xx);
+                }
                 for(y = top; y < h_2 && y < bottom; y++) {
                     z = ceilingdiff / ((h_2 - y) / h_2) * max_offset;
 
@@ -752,18 +753,17 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         color = 0x00;
                     } else {
                         if(shade & SHADE_PARALLAX) {
-                            wx = (float)x / w * x_ratio * ceiling_dim;
-                            wy = (float)y / h * y_ratio * ceiling_dim;
+                            wy = (float)y / h * ceiling_dim;
                         } else {
                             wx = v.pos.x + (slope.x * z);
                             wy = v.pos.y + (slope.y * z);
                         }
                         tx = (wx * transform22->xx) +
                              (wy * transform22->xy) +
-                             bias->x;
+                             bias.x;
                         ty = (wx * transform22->yx) +
                              (wy * transform22->yy) +
-                             bias->y;
+                             bias.y;
                         color = ceiling_data[(ty & ceiling_mask) << ceiling_shift | (tx & ceiling_mask)];
                     }
 
@@ -791,9 +791,15 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     set_tex(floor_tex, &floor_data, &floor_mask, &floor_shift, &floor_dim);
                 }
 
-                bias = s->flat[FLOOR]->bias;
+                bias.x = s->flat[CEILING]->bias->x;
+                bias.y = s->flat[CEILING]->bias->y;
                 transform22 = s->flat[FLOOR]->transform;
                 shade = s->flat[FLOOR]->shade;
+
+                if(shade & SHADE_PARALLAX) {
+                    wx = (float)x / w * x_ratio * floor_dim;
+                    bias.x += (bg_pan * floor_dim * transform22->xx);
+                }
                 for(y = bottom; y >= 0 && y >= top; y--) {
                     z = floordiff / ((h_2 - y) / h_2) * max_offset;
 
@@ -804,18 +810,17 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         color = 0x00;
                     } else {
                         if(shade & SHADE_PARALLAX) {
-                            wx = (float)x / w * x_ratio * floor_dim;
-                            wy = (float)y / h * y_ratio * floor_dim;
+                            wy = (float)y / h * floor_dim;
                         } else {
                             wx = v.pos.x + (slope.x * z);
                             wy = v.pos.y + (slope.y * z);
                         }
                         tx = (wx * transform22->xx) +
                              (wy * transform22->xy) +
-                             bias->x;
+                             bias.x;
                         ty = (wx * transform22->yx) +
                              (wy * transform22->yy) +
-                             bias->y;
+                             bias.y;
                         color = floor_data[(ty & floor_mask) << floor_shift | (tx & floor_mask)];
                     }
                     if(shade & SHADE_SUB) {
@@ -838,37 +843,37 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 top_line_tex = line->wall[CEILING]->texture;
                 set_tex(top_line_tex, &top_line_data, &top_line_mask, &top_line_shift, &top_line_dim);
             }
-            bias = line->wall[CEILING]->bias;
+            bias.x = s->flat[CEILING]->bias->x;
+            bias.y = s->flat[CEILING]->bias->y;
             transform32 = line->wall[CEILING]->transform;
             shade = line->wall[CEILING]->shade;
+            if(shade & SHADE_PARALLAX) {
+                /* calculate screen X position relative to texture res */
+                wx = (float)x / w * x_ratio * top_line_dim;
+                /* silence a warning */
+                wy = 0.0;
+                /* Z is unused */
+                wz = 0.0;
+                bias.x += (bg_pan * top_line_dim * transform32->xx);
+            } else {
+                /* calculate world coordinates */
+                wx = v.pos.x + (slope.x * total_distance);
+                wy = v.pos.y + (slope.y * total_distance);
+                /* silence a warning */
+                wz = 0.0;
+            }
 
             if(line->sector == NULL) {
                 /* solid wall, no sector on the other side */
-    
-                /* draw wall */
-                if(shade & SHADE_PARALLAX) {
-                    /* calculate screen X position relative to texture res */
-                    /* TODO: try to calculate based on screen aspect */
-                    wx = (float)x / w * x_ratio * top_line_dim;
-                } else {
-                    /* calculate world coordinates */
-                    wx = v.pos.x + (slope.x * total_distance);
-                    wy = v.pos.y + (slope.y * total_distance);
-                }
-
                 for(y = top;
                     y <= bottom && y < h;
                     y++) {
-                    if(shade & SHADE_PARALLAX) {
-                        /* calculate screen Y position */
-                        wy = (float)y / h * y_ratio * top_line_dim;
-                    }
-
                     if(top_line_dim == 0) {
                         color = 0x00;
                     } else {
                         if(shade & SHADE_PARALLAX) {
-                            wz = 0.0;
+                            /* calculate screen y position */
+                            wy = (float)y / h * top_line_dim;
                         } else {
                             /* calculate height */
                             wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
@@ -878,11 +883,11 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         tx = (wx * transform32->xx) +
                              (wy * transform32->xy) +
                              (wz * transform32->xz) +
-                             bias->x;
+                             bias.x;
                         ty = (wx * transform32->yx) +
                              (wy * transform32->yy) +
                              (wz * transform32->yz) +
-                             bias->y;
+                             bias.y;
 
                         /* fetch tex color */
                         color = top_line_data[(ty & top_line_mask) << top_line_shift | (tx & top_line_mask)];
@@ -911,25 +916,15 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             next_y = h_2 - (ceilingdiff / total_distance * max_offset * h_2);
             if(next_y > top) {
                 /* draw top wall */
-                if(shade & SHADE_PARALLAX) {
-                    wx = (float)x / w * x_ratio * top_line_dim;
-                } else {
-                    wx = v.pos.x + (slope.x * total_distance);
-                    wy = v.pos.y + (slope.y * total_distance);
-                }
-
+                /* wx and wy should already be set */
                 for(y = top;
                     y <= next_y && y < h;
                     y++) {
-                    if(shade & SHADE_PARALLAX) {
-                        wy = (float)y / h * y_ratio * top_line_dim;
-                    }
-
                     if(top_line_dim == 0) {
                         color = 0x00;
                     } else {
                         if(shade & SHADE_PARALLAX) {
-                            wz = 0.0;
+                            wy = (float)y / h * top_line_dim;
                         } else {
                             wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
                         }
@@ -937,11 +932,11 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         tx = (wx * transform32->xx) +
                              (wy * transform32->xy) +
                              (wz * transform32->xz) +
-                             bias->x;
+                             bias.x;
                         ty = (wx * transform32->yx) +
                              (wy * transform32->yy) +
                              (wz * transform32->yz) +
-                             bias->y;
+                             bias.y;
                         color = top_line_data[(ty & top_line_mask) << top_line_shift | (tx & top_line_mask)];
                     }
 
@@ -969,12 +964,16 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     bottom_line_tex = line->wall[FLOOR]->texture;
                     set_tex(bottom_line_tex, &bottom_line_data, &bottom_line_mask, &bottom_line_shift, &bottom_line_dim);
                 }
-                bias = line->wall[FLOOR]->bias;
+                bias.x = s->flat[CEILING]->bias->x;
+                bias.y = s->flat[CEILING]->bias->y;
                 transform32 = line->wall[FLOOR]->transform;
                 shade = line->wall[FLOOR]->shade;
 
+                /* shade can be different, so recalculate */
                 if(shade & SHADE_PARALLAX) {
-                    wx = (float)x / w * x_ratio * bottom_line_dim;
+                    wx = (float)x / w * x_ratio * top_line_dim;
+                    wz = 0.0;
+                    bias.x += (bg_pan * bottom_line_dim * transform32->xx);
                 } else {
                     wx = v.pos.x + (slope.x * total_distance);
                     wy = v.pos.y + (slope.y * total_distance);
@@ -983,15 +982,11 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 for(y = bottom;
                     y >= next_y && y >= 0;
                     y--) {
-                    if(shade & SHADE_PARALLAX) {
-                        wy = (float)y / h * y_ratio * bottom_line_dim;
-                    }
-
                     if(bottom_line_dim == 0) {
                         color = 0x00;
                     } else {
                         if(shade & SHADE_PARALLAX) {
-                            wz = 0.0;
+                            wy = (float)y / h * top_line_dim;
                         } else {
                             wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
                         }
@@ -999,11 +994,11 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         tx = (wx * transform32->xx) +
                              (wy * transform32->xy) +
                              (wz * transform32->xz) +
-                             bias->x;
+                             bias.x;
                         ty = (wx * transform32->yx) +
                              (wy * transform32->yy) +
                              (wz * transform32->yz) +
-                             bias->y;
+                             bias.y;
                         color = bottom_line_data[(ty & bottom_line_mask) << bottom_line_shift | (tx & bottom_line_mask)];
                     }
 

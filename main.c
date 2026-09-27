@@ -313,6 +313,8 @@ int main(int argc, char **argv) {
             v.angle = fmodf(v.angle + ((float)turning * M_PI * 0.01), M_PI * 2.0);
             if(v.angle < 0.0) {
                 v.angle += M_PI * 2.0;
+            } else if(v.angle >= M_PI * 2.0) {
+                v.angle -= M_PI * 2.0;
             }
             redraw = 1;
         }
