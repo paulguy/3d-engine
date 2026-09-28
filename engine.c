@@ -740,8 +740,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 shade = s->flat[CEILING]->shade;
                 if(shade & SHADE_PARALLAX) {
                     wx = (float)x / w * x_ratio * ceiling_dim;
-                    /* apply panning with maybe appropriate scale parameters? */
-                    bias.x += (bg_pan * ceiling_dim * transform22->xx);
+                    /* apply panning */
+                    bias.x += bg_pan * ceiling_dim;
                 }
                 for(y = top; y < h_2 && y < bottom; y++) {
                     z = ceilingdiff / ((h_2 - y) / h_2) * max_offset;
@@ -791,14 +791,14 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     set_tex(floor_tex, &floor_data, &floor_mask, &floor_shift, &floor_dim);
                 }
 
-                bias.x = s->flat[CEILING]->bias->x;
-                bias.y = s->flat[CEILING]->bias->y;
+                bias.x = s->flat[FLOOR]->bias->x;
+                bias.y = s->flat[FLOOR]->bias->y;
                 transform22 = s->flat[FLOOR]->transform;
                 shade = s->flat[FLOOR]->shade;
 
                 if(shade & SHADE_PARALLAX) {
                     wx = (float)x / w * x_ratio * floor_dim;
-                    bias.x += (bg_pan * floor_dim * transform22->xx);
+                    bias.x += bg_pan * floor_dim;
                 }
                 for(y = bottom; y >= 0 && y >= top; y--) {
                     z = floordiff / ((h_2 - y) / h_2) * max_offset;
@@ -843,8 +843,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 top_line_tex = line->wall[CEILING]->texture;
                 set_tex(top_line_tex, &top_line_data, &top_line_mask, &top_line_shift, &top_line_dim);
             }
-            bias.x = s->flat[CEILING]->bias->x;
-            bias.y = s->flat[CEILING]->bias->y;
+            bias.x = line->wall[CEILING]->bias->x;
+            bias.y = line->wall[CEILING]->bias->y;
             transform32 = line->wall[CEILING]->transform;
             shade = line->wall[CEILING]->shade;
             if(shade & SHADE_PARALLAX) {
@@ -854,7 +854,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 wy = 0.0;
                 /* Z is unused */
                 wz = 0.0;
-                bias.x += (bg_pan * top_line_dim * transform32->xx);
+                bias.x += bg_pan * top_line_dim;
             } else {
                 /* calculate world coordinates */
                 wx = v.pos.x + (slope.x * total_distance);
@@ -964,8 +964,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                     bottom_line_tex = line->wall[FLOOR]->texture;
                     set_tex(bottom_line_tex, &bottom_line_data, &bottom_line_mask, &bottom_line_shift, &bottom_line_dim);
                 }
-                bias.x = s->flat[CEILING]->bias->x;
-                bias.y = s->flat[CEILING]->bias->y;
+                bias.x = line->wall[CEILING]->bias->x;
+                bias.y = line->wall[CEILING]->bias->y;
                 transform32 = line->wall[FLOOR]->transform;
                 shade = line->wall[FLOOR]->shade;
 
@@ -973,7 +973,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                 if(shade & SHADE_PARALLAX) {
                     wx = (float)x / w * x_ratio * top_line_dim;
                     wz = 0.0;
-                    bias.x += (bg_pan * bottom_line_dim * transform32->xx);
+                    bias.x += bg_pan * bottom_line_dim;
                 } else {
                     wx = v.pos.x + (slope.x * total_distance);
                     wy = v.pos.y + (slope.y * total_distance);
