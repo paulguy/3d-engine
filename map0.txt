@@ -15,8 +15,8 @@ Matrix2x2 as floor
 0.0 1.0
 
 Matrix2x2 as sky
-4.0 0.0
-0.0 4.0
+0.5 0.0
+0.0 1.0
 
 Matrix3x2 as north
 1.0 0.0 0.0
@@ -24,6 +24,9 @@ Matrix3x2 as north
 Matrix3x2 as north_2
 2.0 0.0 0.0
 0.0 0.0 2.0
+Matrix3x2 as north_wide
+0.67 0.0 0.0
+0.0 0.0 1.0
 Matrix3x2 as northeast
 0.7 -0.7 0.0
 0.0 0.0 1.0
@@ -62,12 +65,13 @@ Matrix3x2 as northwest
 0.0 0.0 1.0
 
 Matrix3x2 as sky
-4.0 0.0 0.0
-0.0 4.0 0.0
+0.5 0.0 0.0
+0.0 1.0 0.0
 
 # west is definitely used and it doesn't matter here
 wall as black solid 000 no_scroll west
 wall as metal solid 112 no_scroll west
+wall as sky cloudy_sky parallax sub 110 no_scroll sky
 
 wall as bricks_w bricks sub 110 no_scroll west_2
 wall as bricks_e bricks sub 110 no_scroll east_2
@@ -85,21 +89,25 @@ line row1+1 black black
 point 128 576
 line row1+2 metal black
 point 128 -32
-line row1+3 black black
+line row1+3 sky black
 sector as row1 104 0 sky blacktop row1 4
 
-point as door1_scroll -22 0
-wall as garage_door_w1 garage_door sub 110 door1_scroll west_wide
-wall as garage_door_e1 garage_door sub 110 door1_scroll east_wide
-point as door2_scroll 21 0
-wall as garage_door_w2 garage_door sub 110 door2_scroll west_wide
-wall as garage_door_e2 garage_door sub 110 door2_scroll east_wide
-point as door3_scroll 0 0
-wall as garage_door_w3 garage_door sub 110 door3_scroll west_wide
-wall as garage_door_e3 garage_door sub 110 door3_scroll east_wide
-point as door4_scroll 0 0
-wall as garage_door_w4 garage_door sub 110 door4_scroll west_wide
-wall as garage_door_e4 garage_door sub 110 door4_scroll east_wide
+point as doorw1_scroll -21.5 0
+wall as garage_door_w1 garage_door sub 110 doorw1_scroll west_wide
+point as doore1_scroll 21 0
+wall as garage_door_e1 garage_door sub 110 doore1_scroll east_wide
+point as doorw2_scroll 21 0
+wall as garage_door_w2 garage_door sub 110 doorw2_scroll west_wide
+point as doore2_scroll -21.5 0
+wall as garage_door_e2 garage_door sub 110 doore2_scroll east_wide
+wall as garage_door_w3 garage_door sub 110 no_scroll west_wide
+wall as garage_door_e3 garage_door sub 110 no_scroll east_wide
+point as doorw4_scroll -21.5 0
+wall as garage_door_w4 garage_door sub 110 doorw4_scroll west_wide
+point as doore4_scroll 21 0
+wall as garage_door_e4 garage_door sub 110 doore4_scroll east_wide
+
+wall as garage_door_n1 garage_door sub 110 no_scroll north_wide
 
 point as row1_left -136 -32
 line as row1_left row1_left bricks_w black
@@ -126,7 +134,7 @@ line row1_left+8 bricks_w black
 point -136 576
 line row1_left+9 black black
 line row1+1 black black
-line row1 black black
+line row1 sky black
 sector as row1_left 96 0 black blacktop row1_left 12
 link row1 row1 row1_left row1_left+10
 
@@ -190,7 +198,7 @@ line row1_right+7 bricks_e black
 point 136 32
 line row1_right+8 bricks_e black
 point 136 -32
-line row1_right+9 black black
+line row1_right+9 sky black
 line row1+3 black black
 line row1+2 black black
 sector as row1_right 96 0 black blacktop row1_right 12
@@ -207,48 +215,144 @@ point 144 32
 
 line as row1_right_door1 row1_right+2 black black
 line row1_right+1 metal black
-line row1_right_doors garage_door_e1 black
+line row1_right_doors garage_door_e4 black
 line row1_right_doors+1 metal black
 sector as row1_right_door1 64 0 black blacktop row1_right_door1 4
 link row1_right row1_right+1 row1_right_door1 row1_right_door1
 
 line as row1_right_door2 row1_right+4 black black
 line row1_right+3 metal black
-line row1_right_doors+2 garage_door_e2 black
+line row1_right_doors+2 garage_door_e3 black
 line row1_right_doors+3 metal black
 sector as row1_right_door2 64 0 black blacktop row1_right_door2 4
 link row1_right row1_right+3 row1_right_door2 row1_right_door2
 
 line as row1_right_door3 row1_right+6 black black
 line row1_right+5 metal black
-line row1_right_doors+4 garage_door_e3 black
+line row1_right_doors+4 garage_door_e2 black
 line row1_right_doors+5 black black
 sector as row1_right_door3 64 0 black blacktop row1_right_door3 4
 link row1_right row1_right+5 row1_right_door3 row1_right_door3
 
 line as row1_right_door4 row1_right+8 black black
 line row1_right+7 metal black
-line row1_right_doors+6 garage_door_e4 black
+line row1_right_doors+6 garage_door_e1 black
 line row1_right_doors+7 metal black
 sector as row1_right_door4 64 0 black blacktop row1_right_door4 4
 link row1_right row1_right+7 row1_right_door4 row1_right_door4
 
-point as row2 -512 576
-line as row2 row2 black black
-point -512 832
-line row2+1 black black
-point 1024 832
-line row2+2 black black
-point 1024 576
+point as row2 -384 576
+line as row2 row2 sky black
+point -384 832
+line row2+1 metal black
+point 1088 832
+line row2+2 sky black
+point 1088 576
 line row2+3 bricks_s black
+point 1024 576
+line row2+4 bricks_s black
 line row1_right black black
 line row1+2 black black
 line row1+1 black black
 line row1_left+9 bricks_s black
-sector as row2 104 0 sky blacktop row2 8
-link row1_right row1_right+11 row2 row2+4
-link row1 row1+1 row2 row2+5
-link row1_left row1_left+9 row2 row2+6
+sector as row2 104 0 sky blacktop row2 9
+link row1_right row1_right+11 row2 row2+5
+link row1 row1+1 row2 row2+6
+link row1_left row1_left+9 row2 row2+7
+
+line as row2_left row2+1 sky black
+point as row2_left -384 840
+line row2_left bricks_n black
+point -320 840
+line row2_left+1 bricks_n black
+point -224 840
+line row2_left+2 bricks_n black
+point -192 840
+line row2_left+3 bricks_n black
+point -96 840
+line row2_left+4 bricks_n black
+point -64 840
+line row2_left+5 bricks_n black
+point 32 840
+line row2_left+6 bricks_n black
+point 64 840
+line row2_left+7 bricks_n black
+point 160 840
+line row2_left+8 bricks_n black
+point 192 840
+line row2_left+9 bricks_n black
+point 288 840
+line row2_left+10 bricks_n black
+point 320 840
+line row2_left+11 bricks_n black
+point 384 840
+line row2_left+12 bricks_n black
+point 416 840
+line row2_left+13 bricks_n black
+point 512 840
+line row2_left+14 bricks_n black
+point 544 840
+line row2_left+15 bricks_n black
+point 640 840
+line row2_left+16 bricks_n black
+point 672 840
+line row2_left+17 bricks_n black
+point 768 840
+line row2_left+18 bricks_n black
+point 800 840
+line row2_left+19 bricks_n black
+point 896 840
+line row2_left+20 bricks_n black
+point 928 840
+line row2_left+21 bricks_n black
+point 1024 840
+line row2_left+22 bricks_n black
+point 1088 840
+line row2_left+23 bricks_n black
+line row2+2 sky black
+sector as row2_left 96 0 black blacktop row2_left 26
+link row2_left row2_left+25 row2 row2+1
+
+point as row2_left_doors -320 848
+# door
+point -224 848
+point -192 848
+# door
+point -96 848
+point -64 848
+# door
+point 32 848
+point 64 848
+# door
+point 160 848
+point 192 848
+# door
+point 288 848
+point 320 848
+# door
+point 384 848
+point 416 848
+# door
+point 512 848
+point 544 848
+# door
+point 640 848
+point 672 848
+# door
+point 768 848
+point 800 848
+# door
+point 896 848
+point 928 848
+# door
+point 1024 848
+
+line as row2_left_door1 row2_left_doors garage_door_n1 black
+line row2_left_doors+1 metal black
+line row2_left+2 black black
+line row2_left+1 metal black
+sector as row2_left_door1 64 0 black blacktop row2_left_door1 4
+link row2_left_door1 row2_left_door1+2 row2_left row2_left+2
 
 point as view1_start 0 0
 View row1 view1_start 0.0 32.0 60.0
