@@ -285,6 +285,20 @@ int main(int argc, char **argv) {
                         default:
                             continue;
                     }
+
+                    if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_SHIFT) {
+                        if(move > 0) {
+                            move = 10;
+                        } else if(move < 0) {
+                            move = -10;
+                        }
+                        if(strafe > 0) {
+                            strafe = 10;
+                        } else if(strafe < 0) {
+                            strafe = -10;
+                        }
+                    }
+
                     break;
                 case SDL_EVENT_KEY_UP:
                     switch(((SDL_KeyboardEvent *)&event)->key) {
