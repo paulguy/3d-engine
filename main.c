@@ -46,6 +46,18 @@
 #include "log.h"
 #include "cache.h"
 
+typedef enum {
+    SEL_POINT = 0,
+    SEL_LINE,
+    SEL_SECTOR
+} SelectionTarget;
+
+const SelectionTarget NEXT_TARGET[] = {
+    SEL_LINE,
+    SEL_SECTOR,
+    SEL_POINT
+};
+
 SDL_Surface *load_png_checked(unsigned char number) {
     char name[16];
     snprintf(name, sizeof(name), "tex%hhd.png", number);
@@ -146,8 +158,15 @@ int main(int argc, char **argv) {
     int turning = 0;
     int move = 0;
     int strafe = 0;
+    int action = 0;
     Point total_move;
     SDL_Event event;
+    SDL_MouseButtonEvent *mevent;
+
+    SelectionTarget target = SEL_POINT;
+    Point *h_point = NULL;
+    Line *h_line = NULL;
+    Sector *h_sector = NULL;
 
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 
@@ -231,7 +250,10 @@ int main(int argc, char **argv) {
                 LOG("Failed to lock surface: %s\n", SDL_GetError());
             }
 
-            engine_render((unsigned char *)(surface->pixels), surface->w, surface->h, surface->pitch);
+            engine_render((unsigned char *)(surface->pixels), surface->w, surface->h, surface->pitch,
+                          target == SEL_POINT ? h_point : NULL,
+                          target == SEL_LINE ? h_line : NULL,
+                          target == SEL_SECTOR ? h_sector : NULL);
 
             SDL_UnlockSurface(surface);
 
@@ -251,6 +273,8 @@ int main(int argc, char **argv) {
         while(SDL_PollEvent(&event)) {
             switch(event.type) {
                 case SDL_EVENT_QUIT:
+                    running = 0;
+                    break;
                 case SDL_EVENT_KEY_DOWN:
                     switch(((SDL_KeyboardEvent *)&event)->key) {
                         case SDLK_LEFT:
@@ -277,6 +301,9 @@ int main(int argc, char **argv) {
                                 fprintf(stderr, "\n");
                                 redraw = 1;
                             }
+                            break;
+                        case SDLK_TAB:
+                            target = NEXT_TARGET[target];
                             break;
                         case SDLK_ESCAPE:
                         case SDLK_Q:
@@ -318,6 +345,26 @@ int main(int argc, char **argv) {
                             continue;
                     }
                     break;
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    mevent = (SDL_MouseButtonEvent *)(&event);
+                    if(mevent->down && mevent->button == 1) {
+                        switch(target) {
+                            case SEL_SECTOR:
+                                h_sector = get_sector((unsigned int)mevent->x, (unsigned int)mevent->y,
+                                                      surface->w, surface->h);
+                                break;
+                            case SEL_LINE:
+                                h_line = get_line((unsigned int)mevent->x, (unsigned int)mevent->y,
+                                                  surface->w, surface->h);
+                                break;
+                            case SEL_POINT:
+                                h_point = get_point((unsigned int)mevent->x, (unsigned int)mevent->y,
+                                                    surface->w, surface->h);
+                                break;
+                        }
+                        redraw = 1;
+                    }
+                    break;
                 default:
                     continue;
             }
@@ -346,8 +393,7 @@ int main(int argc, char **argv) {
         }
 
         if(total_move.x != 0.0 || total_move.y != 0.0) {
-            engine_move(total_move.x, total_move.y);
-            fprintf(stderr, "\r%f %f %f", v.pos.x, v.pos.y, v.angle);
+            engine_move(total_move.x, total_move.y, action);
             redraw = 1;
         }
     }

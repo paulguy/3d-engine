@@ -1,6 +1,6 @@
 OBJS   = log.o cache.o engine.o main.o
 TARGET = engine
-CFLAGS := `pkg-config sdl3 --cflags` -D_GNU_SOURCE -Wall -Wextra -fpermissive -ggdb -Og $(CFLAGS)
+CFLAGS := `pkg-config sdl3 --cflags` -D_GNU_SOURCE -DEDITOR -Wall -Wextra -ggdb -Og $(CFLAGS)
 LDFLAGS = `pkg-config sdl3 --libs` -lm
 
 $(TARGET): $(OBJS)

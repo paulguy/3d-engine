@@ -100,6 +100,9 @@
 #define SHADE_SUB (0x100)
 #define SHADE_PARALLAX (0x200)
 
+#define HIGHLIGHT_DENSITY (4)
+#define HIGHLIGHT_LINE_THICKNESS (2.0)
+
 unsigned char mapnum;
 View v;
 Point waypoint;
@@ -624,8 +627,12 @@ void set_tex(unsigned char num,
     }
 }
 
-void engine_render(unsigned char *pixels, int w, int h, int pitch) {
-    Sector *s, *last_s;
+void engine_render(unsigned char *pixels, int w, int h, int pitch
+#ifdef EDITOR
+                   , Point *h_point, Line *h_line, Sector *h_sector
+#endif
+        ) {
+    Sector *sector, *last_s;
     float offset;
     Point slope;
     int vvertical;
@@ -699,7 +706,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
             vslope = slope.y / slope.x;
         }
  
-        s = v.start;
+        sector = v.start;
         last_s = NULL;
         top = 0;
         bottom = h - 1;
@@ -707,7 +714,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
         pos.y = v.pos.y;
         total_distance = 0.0;
         while (true) {
-            line = scan_sector(last_s, s, &pos,
+            line = scan_sector(last_s, sector, &pos,
                                &slope, vvertical, vslope,
                                &hit);
 
@@ -724,20 +731,22 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
              * Texture X and Y lookup from offset from view given ray angle */
 
             /* draw ceiling */
-            ceilingdiff = s->height[0] - v.height;
+            ceilingdiff = sector->height[CEILING] - v.height;
             if(ceilingdiff > 0.0) {
                 /* ceiling is above the view line */
 
                 /* get ceiling texture */
-                if(s->flat[CEILING]->texture != ceiling_tex) {
-                    ceiling_tex = s->flat[CEILING]->texture;
+                if(sector->flat[CEILING]->texture != ceiling_tex) {
+                    ceiling_tex = sector->flat[CEILING]->texture;
                     set_tex(ceiling_tex, &ceiling_data, &ceiling_mask, &ceiling_shift, &ceiling_dim);
                 }
  
-                bias.x = s->flat[CEILING]->bias->x;
-                bias.y = s->flat[CEILING]->bias->y;
-                transform22 = s->flat[CEILING]->transform;
-                shade = s->flat[CEILING]->shade;
+                bias.x = sector->flat[CEILING]->bias->x;
+                bias.y = sector->flat[CEILING]->bias->y;
+                transform22 = sector->flat[CEILING]->transform;
+                shade = sector->flat[CEILING]->shade;
+                /* silence a warning */
+                wy = 0.0;
                 if(shade & SHADE_PARALLAX) {
                     wx = (float)x / w * x_ratio * ceiling_dim;
                     /* apply panning */
@@ -777,25 +786,38 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         color += shade & 0xFF; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
+#ifdef EDITOR
+                    if(h_point != NULL && fabsf(h_point->x - wx) < HIGHLIGHT_LINE_THICKNESS && fabsf(h_point->y - wy) < HIGHLIGHT_LINE_THICKNESS) {
+                        if((x ^ y) % HIGHLIGHT_DENSITY == 0) {
+                            color = ~color;
+                        }
+                    }
 
+                    if(sector == h_sector) {
+                        if((x ^ y) % HIGHLIGHT_DENSITY == 0) {
+                            color = ~color;
+                        }
+                    }
+#endif
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
                 }
                 top = y;
             }
 
             /* draw floor */
-            floordiff = s->height[FLOOR] - v.height;
+            floordiff = sector->height[FLOOR] - v.height;
             if(floordiff < 0.0) {
-                if(s->flat[FLOOR]->texture != floor_tex) {
-                    floor_tex = s->flat[FLOOR]->texture;
+                if(sector->flat[FLOOR]->texture != floor_tex) {
+                    floor_tex = sector->flat[FLOOR]->texture;
                     set_tex(floor_tex, &floor_data, &floor_mask, &floor_shift, &floor_dim);
                 }
 
-                bias.x = s->flat[FLOOR]->bias->x;
-                bias.y = s->flat[FLOOR]->bias->y;
-                transform22 = s->flat[FLOOR]->transform;
-                shade = s->flat[FLOOR]->shade;
-
+                bias.x = sector->flat[FLOOR]->bias->x;
+                bias.y = sector->flat[FLOOR]->bias->y;
+                transform22 = sector->flat[FLOOR]->transform;
+                shade = sector->flat[FLOOR]->shade;
+                /* silence a warning */
+                wy = 0.0;
                 if(shade & SHADE_PARALLAX) {
                     wx = (float)x / w * x_ratio * floor_dim;
                     bias.x += bg_pan * floor_dim;
@@ -833,6 +855,19 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         color += shade & 0xFF; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
+#ifdef EDITOR
+                    if(h_point != NULL && fabsf(h_point->x - wx) < HIGHLIGHT_LINE_THICKNESS && fabsf(h_point->y - wy) < HIGHLIGHT_LINE_THICKNESS) {
+                        if((x ^ y) % HIGHLIGHT_DENSITY == 0) {
+                            color = ~color;
+                        }
+                    }
+
+                    if(sector == h_sector) {
+                        if((x ^ y) % HIGHLIGHT_DENSITY == 0) {
+                            color = ~color;
+                        }
+                    }
+#endif
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
                 }
                 bottom = y;
@@ -903,16 +938,29 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         color += shade & 0xFF; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
+#ifdef EDITOR
+                    if(h_point != NULL && fabsf(h_point->x - wx) < HIGHLIGHT_LINE_THICKNESS && fabsf(h_point->y - wy) < HIGHLIGHT_LINE_THICKNESS) {
+                        if((x ^ y) % HIGHLIGHT_DENSITY == 0) {
+                            color = ~color;
+                        }
+                    }
+
+                    if(line == h_line) {
+                        if((x ^ y) % HIGHLIGHT_DENSITY == 0) {
+                            color = ~color;
+                        }
+                    }
+#endif
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
                 }
                 break;
             }
 
             /* get sector on other side of the line while keeping note of the last sector so raycasting won't traverse back through it */
-            last_s = s;
-            s = line->sector;
+            last_s = sector;
+            sector = line->sector;
 
-            ceilingdiff = s->height[CEILING] - v.height;
+            ceilingdiff = sector->height[CEILING] - v.height;
             next_y = h_2 - (ceilingdiff / total_distance * max_offset * h_2);
             if(next_y > top) {
                 /* draw top wall */
@@ -950,13 +998,26 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         color += shade & 0xFF; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
+#ifdef EDITOR
+                    if(h_point != NULL && fabsf(h_point->x - wx) < HIGHLIGHT_LINE_THICKNESS && fabsf(h_point->y - wy) < HIGHLIGHT_LINE_THICKNESS) {
+                        if((x ^ y) % HIGHLIGHT_DENSITY == 0) {
+                            color = ~color;
+                        }
+                    }
+
+                    if(line == h_line) {
+                        if((x ^ y) % HIGHLIGHT_DENSITY == 0) {
+                            color = ~color;
+                        }
+                    }
+#endif
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
                 }
                 top = y;
             }
 
             /* draw bottom wall */
-            floordiff = s->height[FLOOR] - v.height;
+            floordiff = sector->height[FLOOR] - v.height;
             next_y = h_2 - (floordiff / total_distance * max_offset * h_2);
             if(next_y < bottom) {
                 /* bottom wall texture will be needed */
@@ -1012,6 +1073,19 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
                         color += shade & 0xFF; /* add */
                         color |= ((color & 0x124) >> 1) | ((color & 0x124) >> 2); /* mask overflow bits over color bits */
                     }
+#ifdef EDITOR
+                    if(h_point != NULL && fabsf(h_point->x - wx) < HIGHLIGHT_LINE_THICKNESS && fabsf(h_point->y - wy) < HIGHLIGHT_LINE_THICKNESS) {
+                        if((x ^ y) % HIGHLIGHT_DENSITY == 0) {
+                            color = ~color;
+                        }
+                    }
+
+                    if(line == h_line) {
+                        if((x ^ y) % HIGHLIGHT_DENSITY == 0) {
+                            color = ~color;
+                        }
+                    }
+#endif
                     pixels[y * pitch + x] = 0xC0 | ((color & 0xC0) >> 2) | ((color & 0x18) >> 1) | (color & 0x03); /* shift bits in */
                 }
                 bottom = y;
@@ -1028,11 +1102,11 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch) {
     }
 }
 
-int do_action(Sector *s) {
-    switch(s->action & 0xFF) {
+int do_action(Sector *sector) {
+    switch(sector->action & 0xFF) {
         case ACTION_WARP:
-            unsigned char map = (s->action & 0xFF00) >> 8;
-            unsigned char view = (s->action & 0xFF0000) >> 16;
+            unsigned char map = (sector->action & 0xFF00) >> 8;
+            unsigned char view = (sector->action & 0xFF0000) >> 16;
             if(map == mapnum) {
                 /* views aren't stored, so load the view from file */
 
@@ -1066,8 +1140,8 @@ int do_action(Sector *s) {
             }
             return(1);
         case ACTION_WAYPOINT:
-            unsigned short firstpoint = (s->action & 0xFFFF00) >> 8;
-            unsigned short count = (s->action & 0xFF000000) >> 24;
+            unsigned short firstpoint = (sector->action & 0xFFFF00) >> 8;
+            unsigned short count = (sector->action & 0xFF000000) >> 24;
             /* count is mapped to start at 1, avoids division by 0 */
             count++;
             /* pick a waypoint by random */
@@ -1080,7 +1154,8 @@ int do_action(Sector *s) {
     return(0);
 }
 
-void engine_move(float x, float y) {
+void engine_move(float x, float y,
+                 int action) {
     Point slope;
     Point dest;
     int vvertical;
@@ -1088,7 +1163,7 @@ void engine_move(float x, float y) {
     Point pos;
     Point hit;
     Line *line;
-    Sector *s;
+    Sector *sector;
     Sector *last_s;
 
     /* calculate slope values, this doesn't need a planar projection, so just divide rise/run */
@@ -1111,9 +1186,9 @@ void engine_move(float x, float y) {
     pos.x = v.pos.x;
     pos.y = v.pos.y;
     last_s = NULL;
-    s = v.start;
+    sector = v.start;
     while(true) {
-        line = scan_sector(last_s, s, &pos,
+        line = scan_sector(last_s, sector, &pos,
                            &slope, vvertical, vslope,
                            &hit);
 
@@ -1148,21 +1223,273 @@ void engine_move(float x, float y) {
         /* update working position and sector */
         pos.x = hit.x;
         pos.y = hit.y;
-        last_s = s;
-        s = line->sector;
+        last_s = sector;
+        sector = line->sector;
 
-        if(do_action(s)) {
-            /* do_action indicated that it already updated the view state */
-            return;
-        };
+        if(action) {
+            if(do_action(sector)) {
+                /* do_action indicated that it already updated the view state */
+                return;
+            }
+        }
     }
 
     /* finally, update player position and sector */
     v.pos.x = dest.x;
     v.pos.y = dest.y;
-    v.start = s;
-    v.height = s->height[1] + v.startheight;
+    v.start = sector;
+    v.height = sector->height[1] + v.startheight;
 }
+
+#ifdef EDITOR
+int get_hit(unsigned int mx, unsigned int my,
+            unsigned int w, unsigned int h,
+            Sector **sector, Line **line,
+            float *wx, float *wy, float *wz) {
+    Sector *last_s;
+    float offset;
+    Point slope;
+    int vvertical;
+    float vslope;
+    Point hit;
+    float total_distance;
+    int y;
+    float z;
+    int top, bottom;
+    Point pos;
+    float ceilingdiff;
+    float floordiff;
+    float next_y;
+
+    float w_2 = (float)w / 2.0;
+    float h_2 = (float)h / 2.0;
+    float fov_2 = v.fov / 2.0;
+    float sin_angle = sin(v.angle);
+    float cos_angle = cos(v.angle);
+    float max_offset = atan2f(fov_2, 1.0) * 2.0;
+ 
+    offset = (float)(mx - w_2) / w_2 * max_offset;
+    slope.x = sin_angle + (cos_angle * offset);
+    slope.y = cos_angle - (sin_angle * offset);
+
+    if(fabs(slope.y) > fabs(slope.x)) {
+        /* view ray about Y axis */
+        vvertical = 1;
+        vslope = slope.x / slope.y;
+    } else {
+        /* view ray about X axis */
+        vvertical = 0;
+        vslope = slope.y / slope.x;
+    }
+
+    *line = NULL;
+    *sector = v.start;
+    last_s = NULL;
+    top = 0;
+    bottom = h - 1;
+    pos.x = v.pos.x;
+    pos.y = v.pos.y;
+    total_distance = 0.0;
+    while (true) {
+        *line = scan_sector(last_s, *sector, &pos,
+                            &slope, vvertical, vslope,
+                            &hit);
+
+        /* shouldn't happen, but in case the ray misses for some reason */
+        if(*line == NULL) {
+            break;
+        }
+
+        /* get the distance between the view and hit coordinates */
+        total_distance += get_distance2(&pos, &hit, &slope);
+
+        /* iterate y (angle transformed with FOV to get an angle from screen Y) with height
+         * from bottom solving for distance until total distance is reached.
+         * Texture X and Y lookup from offset from view given ray angle */
+
+        /* draw ceiling */
+        ceilingdiff = (*sector)->height[CEILING] - v.height;
+        if(ceilingdiff > 0.0) {
+            /* ceiling is above the view line */
+
+            for(y = top; y < h_2 && y < bottom; y++) {
+                z = ceilingdiff / ((h_2 - y) / h_2) * max_offset;
+
+                if(z > total_distance) {
+                    break;
+                }
+                *wx = v.pos.x + (slope.x * z);
+                *wy = v.pos.y + (slope.y * z);
+                if(y == my) {
+                    *wz = (*sector)->height[CEILING];
+                    return(0);
+                }
+            }
+            top = y;
+        }
+
+        /* draw floor */
+        floordiff = (*sector)->height[FLOOR] - v.height;
+        if(floordiff < 0.0) {
+            for(y = bottom; y >= 0 && y >= top; y--) {
+                z = floordiff / ((h_2 - y) / h_2) * max_offset;
+
+                if(z >= total_distance) {
+                    break;
+                }
+                *wx = v.pos.x + (slope.x * z);
+                *wy = v.pos.y + (slope.y * z);
+                if(y == my) {
+                    *wz = (*sector)->height[FLOOR];
+                    return(0);
+                }
+            }
+            bottom = y;
+        }
+
+        *wx = v.pos.x + (slope.x * total_distance);
+        *wy = v.pos.y + (slope.y * total_distance);
+
+        if((*line)->sector == NULL) {
+            /* solid wall, no sector on the other side */
+            for(y = top;
+                y <= bottom && y < h;
+                y++) {
+                *wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
+                if(y == my) {
+                    return(0);
+                }
+            }
+            break;
+        }
+
+        /* get sector on other side of the line while keeping note of the last sector so raycasting won't traverse back through it */
+        last_s = *sector;
+        *sector = (*line)->sector;
+
+        ceilingdiff = (*sector)->height[CEILING] - v.height;
+        next_y = h_2 - (ceilingdiff / total_distance * max_offset * h_2);
+        if(next_y > top) {
+            /* draw top wall */
+            /* wx and wy should already be set */
+            for(y = top;
+                y <= next_y && y < h;
+                y++) {
+                *wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
+                if(y == my) {
+                    return(0);
+                }
+            }
+            top = y;
+        }
+
+        /* draw bottom wall */
+        floordiff = (*sector)->height[FLOOR] - v.height;
+        next_y = h_2 - (floordiff / total_distance * max_offset * h_2);
+        if(next_y < bottom) {
+            /* bottom wall texture will be needed */
+            *wx = v.pos.x + (slope.x * total_distance);
+            *wy = v.pos.y + (slope.y * total_distance);
+
+            for(y = bottom;
+                y >= next_y && y >= 0;
+                y--) {
+                *wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
+                if(y == my) {
+                    return(0);
+                }
+            }
+            bottom = y;
+        }
+
+        /* column fully drawn */
+        if(top >= bottom) {
+            break;
+        }
+
+        pos.x = hit.x;
+        pos.y = hit.y;
+    }
+
+    return(-1);
+}
+
+Sector *get_sector(unsigned int x, unsigned int y,
+                   unsigned int w, unsigned int h) {
+    Sector *sector;
+    Line *line;
+    float wx;
+    float wy;
+    float wz;
+
+    if(get_hit(x, y, w, h, &sector, &line, &wx, &wy, &wz) != 0) {
+        return(NULL);
+    }
+
+    /* sector will be the sector pointed by the cursor or the sector attached to the wall pointed at */
+    return(sector);
+}
+
+Line *get_line(unsigned int x, unsigned int y,
+               unsigned int w, unsigned int h) {
+    Sector *sector;
+    Line *line;
+    float wx;
+    float wy;
+    float wz;
+
+    if(get_hit(x, y, w, h, &sector, &line, &wx, &wy, &wz) != 0) {
+        return(NULL);
+    }
+
+    /* line will be the wall pointed at or the wall at the far end of the sector on the column pointed at */
+    return(line);
+}
+
+Point *get_point(unsigned int x, unsigned int y,
+                 unsigned int w, unsigned int h) {
+    Sector *sector;
+    Line *line;
+    Point *p1 = NULL, *p2;
+    float wx;
+    float wy;
+    float wz;
+    int i;
+
+    if(get_hit(x, y, w, h, &sector, &line, &wx, &wy, &wz) != 0) {
+        return(NULL);
+    }
+
+    /* find nearest point */
+    /* find point and adjacent point on line in sector */
+    for(i = 0; i < sector->lines; i++) {
+        if(line == &(sector->firstline[i])) {
+            p1 = sector->firstline[i].point;
+            if(i == sector->lines - 1) {
+                p2 = sector->firstline[0].point;
+            } else {
+                p2 = sector->firstline[i+1].point;
+            }
+            break;
+        }
+    }
+
+    if(p1 == NULL) {
+        /* no reason this should happen but prevent a potential crash due to bug */
+        return(NULL);
+    }
+
+    /* compare distances */
+    if(sqrt(pow(wx - p1->x, 2.0) + pow(wy - p1->y, 2.0)) <
+       sqrt(pow(wx - p2->x, 2.0) + pow(wy - p2->y, 2.0))) {
+        /* first point is closer */
+        return(p1);
+    }
+
+    /* second point is closer */
+    return(p2);
+}
+#endif
 
 /* only compile these if detected that it's using the broken pebble SDK math */
 #ifdef BROKEN_MATH

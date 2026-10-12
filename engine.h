@@ -89,9 +89,23 @@ extern read_map_t read_map_p;
 extern close_map_t close_map_p;
 
 int engine_load(unsigned char number, unsigned char view);
-void engine_render(unsigned char *pixels, int w, int h, int pitch);
-void engine_move(float x, float y);
+void engine_render(unsigned char *pixels, int w, int h, int pitch
+#ifdef EDITOR
+                   , Point *h_point, Line *h_line, Sector *h_sector
+#endif
+        );
+void engine_move(float x, float y,
+                 int action);
 
+#ifdef EDITOR
+Sector *get_sector(unsigned int x, unsigned int y,
+                   unsigned int w, unsigned int h);
+Line *get_line(unsigned int x, unsigned int y,
+               unsigned int w, unsigned int h);
+Point *get_point(unsigned int x, unsigned int y,
+                 unsigned int w, unsigned int h);
+#endif
+ 
 float sin_lookup_wrapper(float angle);
 float cos_lookup_wrapper(float angle);
 float tanf_custom(float angle);
