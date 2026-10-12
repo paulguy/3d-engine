@@ -39,13 +39,33 @@
                     "type": "raw"
                 },
                 {
-                    "name": "MAP_0",
-                    "file": "map0.bin",
+                    "name": "TEX_4",
+                    "file": "tex4.bin",
                     "type": "raw"
                 },
                 {
-                    "name": "MAP_1",
-                    "file": "map1.bin",
+                    "name": "TEX_5",
+                    "file": "tex5.bin",
+                    "type": "raw"
+                },
+                {
+                    "name": "TEX_6",
+                    "file": "tex6.bin",
+                    "type": "raw"
+                },
+                {
+                    "name": "TEX_7",
+                    "file": "tex7.bin",
+                    "type": "raw"
+                },
+                {
+                    "name": "TEX_8",
+                    "file": "tex8.bin",
+                    "type": "raw"
+                },
+                {
+                    "name": "MAP_0",
+                    "file": "map0.bin",
                     "type": "raw"
                 }
             ]

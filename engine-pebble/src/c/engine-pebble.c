@@ -53,13 +53,16 @@ const unsigned char TEX_IDS[] = {
     RESOURCE_ID_TEX_0,
     RESOURCE_ID_TEX_1,
     RESOURCE_ID_TEX_2,
-    RESOURCE_ID_TEX_3
+    RESOURCE_ID_TEX_3,
+    RESOURCE_ID_TEX_4,
+    RESOURCE_ID_TEX_5,
+    RESOURCE_ID_TEX_6,
+    RESOURCE_ID_TEX_7
 };
 #define MAX_TEX_ID (sizeof(TEX_IDS) - 1)
 
 const unsigned char MAP_IDS[] = {
-    RESOURCE_ID_MAP_0,
-    RESOURCE_ID_MAP_1
+    RESOURCE_ID_MAP_0
 };
 #define MAX_MAP_ID (sizeof(MAP_IDS) - 1)
 
