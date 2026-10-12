@@ -46,6 +46,10 @@
 #include "log.h"
 #include "cache.h"
 
+/* imprecise, but this is fine */
+#define FRAME_WAIT (20)
+#define MOUSE_SENSITIVITY (0.4)
+
 typedef enum {
     SEL_POINT = 0,
     SEL_LINE,
@@ -158,10 +162,14 @@ int main(int argc, char **argv) {
     int turning = 0;
     int move = 0;
     int strafe = 0;
+    int drag_move = 0;
+    int drag_turn = 0;
     int action = 0;
     Point total_move;
+    float total_turn;
     SDL_Event event;
-    SDL_MouseButtonEvent *mevent;
+    SDL_MouseButtonEvent *mbevent;
+    SDL_MouseMotionEvent *mmevent;
 
     SelectionTarget target = SEL_POINT;
     Point *h_point = NULL;
@@ -268,8 +276,11 @@ int main(int argc, char **argv) {
             LOG("Failed to update window surface: %s\n", SDL_GetError());
         }
 
-        SDL_Delay(20);
+        SDL_Delay(FRAME_WAIT);
 
+        total_turn = 0.0;
+        total_move.x = 0.0;
+        total_move.y = 0.0;
         while(SDL_PollEvent(&event)) {
             switch(event.type) {
                 case SDL_EVENT_QUIT:
@@ -346,54 +357,87 @@ int main(int argc, char **argv) {
                     }
                     break;
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                    mevent = (SDL_MouseButtonEvent *)(&event);
-                    if(mevent->down && mevent->button == 1) {
-                        switch(target) {
-                            case SEL_SECTOR:
-                                h_sector = get_sector((unsigned int)mevent->x, (unsigned int)mevent->y,
+                    mbevent = (SDL_MouseButtonEvent *)(&event);
+                    switch(mbevent->button) {
+                        case SDL_BUTTON_LEFT:
+                            switch(target) {
+                                case SEL_SECTOR:
+                                    h_sector = get_sector((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                                          surface->w, surface->h);
+                                    break;
+                                case SEL_LINE:
+                                    h_line = get_line((unsigned int)mbevent->x, (unsigned int)mbevent->y,
                                                       surface->w, surface->h);
-                                break;
-                            case SEL_LINE:
-                                h_line = get_line((unsigned int)mevent->x, (unsigned int)mevent->y,
-                                                  surface->w, surface->h);
-                                break;
-                            case SEL_POINT:
-                                h_point = get_point((unsigned int)mevent->x, (unsigned int)mevent->y,
-                                                    surface->w, surface->h);
-                                break;
-                        }
-                        redraw = 1;
+                                    break;
+                                case SEL_POINT:
+                                    h_point = get_point((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                                        surface->w, surface->h);
+                                    break;
+                            }
+                            redraw = 1;
+                            break;
+                        case SDL_BUTTON_MIDDLE:
+                            drag_move = 1;
+                            break;
+                        case SDL_BUTTON_RIGHT:
+                            drag_turn = 1;
+                            break;
                     }
                     break;
-                default:
-                    continue;
+                case SDL_EVENT_MOUSE_BUTTON_UP:
+                    mbevent = (SDL_MouseButtonEvent *)(&event);
+                    switch(mbevent->button) {
+                        case SDL_BUTTON_MIDDLE:
+                            drag_move = 0;
+                            break;
+                        case SDL_BUTTON_RIGHT:
+                            drag_turn = 0;
+                            break;
+                    }
+                    break;
+                case SDL_EVENT_MOUSE_MOTION:
+                    mmevent = (SDL_MouseMotionEvent *)(&event);
+                    if(drag_move) {
+                        total_move.x = mmevent->xrel;
+                        total_move.y = -mmevent->yrel;
+                    }
+                    if(drag_turn) {
+                        total_turn = mmevent->xrel * ((float)(FRAME_WAIT) / 1000.0) * M_PI * 2.0 * MOUSE_SENSITIVITY;
+                    }
+                    break;
             }
         }
 
+        if((drag_move == 1 || drag_turn == 1) && !SDL_GetWindowRelativeMouseMode(window)) {
+            SDL_SetWindowRelativeMouseMode(window, 1);
+        } else if((drag_move == 0 && drag_turn == 0) && SDL_GetWindowRelativeMouseMode(window)) {
+            SDL_SetWindowRelativeMouseMode(window, 0);
+        }
+
         if(turning) {
-            v.angle = fmodf(v.angle + ((float)turning * M_PI * 0.01), M_PI * 2.0);
+            total_turn += (float)turning * M_PI * 0.01;
+        }
+
+        if(move) {
+            total_move.y += move;
+        }
+
+        if(strafe) {
+            total_move.x += strafe;
+        }
+
+        if(total_turn != 0.0) {
+            v.angle = fmodf(v.angle + total_turn, M_PI * 2.0);
             if(v.angle < 0.0) {
                 v.angle += M_PI * 2.0;
-            } else if(v.angle >= M_PI * 2.0) {
-                v.angle -= M_PI * 2.0;
             }
             redraw = 1;
         }
 
-        total_move.x = 0.0;
-        total_move.y = 0.0;
-        if(move) {
-            total_move.x += sin(v.angle) * move;
-            total_move.y += cos(v.angle) * move;
-        }
-
-        if(strafe) {
-            total_move.x += sin(v.angle + (M_PI / 2.0)) * strafe;
-            total_move.y += cos(v.angle + (M_PI / 2.0)) * strafe;
-        }
-
         if(total_move.x != 0.0 || total_move.y != 0.0) {
-            engine_move(total_move.x, total_move.y, action);
+            engine_move(sin(v.angle) * total_move.y + sin(v.angle + M_PI / 2.0) * total_move.x,
+                        cos(v.angle) * total_move.y + cos(v.angle + M_PI / 2.0) * total_move.x,
+                        action);
             redraw = 1;
         }
     }
