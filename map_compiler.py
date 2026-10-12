@@ -240,6 +240,15 @@ def action_str(action : int) -> str:
     # shouldn't happen
     return "Unknown"
 
+def angle_difference(angle1 : float, angle2 : float) -> float:
+    # take 2 angles and find angle 2's difference to angle 1's "right" side
+    if angle2 > angle1:
+        # continuous
+        return angle2 - angle1
+
+    # wraps around
+    return (math.pi - angle1) + angle2
+
 @dataclass(frozen=True)
 class Point:
     x : float
@@ -256,6 +265,12 @@ class Point:
 
     def serialize(self):
         return Point.STRUCT.pack(self.x, self.y)
+
+    def angle_to(self, other : Point):
+        # return angle from self to another point with 0.0 going negative along the X axis
+        # and increasing counter clockwise with a usual cartesian grid with positive going up and right
+        # wraps around at +/-pi going positive on the X axis
+        return math.atan2(self.y - other.y, self.x - other.x)
 
     @staticmethod
     def parse(tokens : list[str], token : int) -> tuple[Point, int]:
@@ -468,6 +483,18 @@ class Sector:
         linecount, token = get_single(int, tokens, token, "line count")
         if linecount < 3:
             raise ValueError(f"{linenum}: A sector needs at least 3 lines, or up to 259.")
+        else:
+            # check if vertices are convex, going clockwise and less than 180 degrees
+            for i in range(linecount):
+                point1 : Point = Point.storage[Line.storage[line + i].point]
+                point2 : Point = Point.storage[Line.storage[line + ((i + 1) % linecount)].point]
+                point3 : Point = Point.storage[Line.storage[line + ((i + 2) % linecount)].point]
+                angle1 : float = point2.angle_to(point1)
+                angle2 : float = point2.angle_to(point3)
+                difference : float = angle_difference(angle1, angle2)
+                if difference > math.pi:
+                    warn(f"{linenum}: Point {(i + 1) % linecount} has a concave angle {difference}.")
+
         if line + linecount > len(Line.storage):
             raise ValueError(f"{linenum}: Lines {line} - {line + linecount} goes past end of lines list ({len(Line.storage)}).")
         # duplicate points on a sector wall breaks rendering?
