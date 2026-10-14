@@ -103,20 +103,7 @@
 #define HIGHLIGHT_DENSITY (4)
 #define HIGHLIGHT_LINE_THICKNESS (2.0)
 
-unsigned char mapnum;
-View v;
-Point waypoint;
-Point (*p)[] = NULL;
-Matrix2x2 (*m22)[] = NULL;
-Matrix3x2 (*m32)[] = NULL;
-Wall (*w)[] = NULL;
-Line (*l)[] = NULL;
-Flat (*f)[] = NULL;
-Sector (*s)[] = NULL;
-
-open_map_t open_map_p;
-read_map_t read_map_p;
-close_map_t close_map_p;
+#define NO_SECTOR (0xFFFF)
 
 /* these are all packed in the file, so very efficient access isn't necessary */
 
@@ -206,42 +193,66 @@ typedef union {
     View_data v;
 } Data;
 
+unsigned char mapnum;
+View v;
+Point waypoint;
+Point (*p)[] = NULL;
+Matrix2x2 (*m22)[] = NULL;
+Matrix3x2 (*m32)[] = NULL;
+Wall (*w)[] = NULL;
+Line (*l)[] = NULL;
+Flat (*f)[] = NULL;
+Sector (*s)[] = NULL;
+
+#ifdef EDITOR
+int *point_refs = NULL;
+int *m22_refs = NULL;
+int *m32_refs = NULL;
+int *wall_refs = NULL;
+int *flat_refs = NULL;
+Header h;
+#endif
+
+open_map_t open_map_p;
+read_map_t read_map_p;
+close_map_t close_map_p;
+
 static void print_data(Header *h) {
     int i;
 
     LOG("%hu %hu %hu %hu %hu %hu %hu\n", h->points, h->matrix2x2s, h->matrix3x2s, h->lines, h->sectors, h->links, h->views);
 
     for(i = 0; i < h->points; i++) {
-        LOG("%d Point %p %f %f\n", i, &(*p)[i], (*p)[i].x, (*p)[i].y);
+        LOG("%d Point %f %f\n", i, (*p)[i].x, (*p)[i].y);
     }
 
     for(i = 0; i < h->matrix2x2s; i++) {
-        LOG("%d Matrix2x2 %p %f %f %f %f\n", i, &(*m22)[i], (*m22)[i].xx, (*m22)[i].xy, (*m22)[i].yx, (*m22)[i].yy);
+        LOG("%d Matrix2x2 %f %f %f %f\n", i, (*m22)[i].xx, (*m22)[i].xy, (*m22)[i].yx, (*m22)[i].yy);
     }
 
     for(i = 0; i < h->matrix3x2s; i++) {
-        LOG("%d Matrix3x2 %p %f %f %f %f %f %f\n", i, &(*m32)[i], (*m32)[i].xx, (*m32)[i].xy, (*m32)[i].xz, (*m32)[i].yx, (*m32)[i].yy, (*m32)[i].yz);
+        LOG("%d Matrix3x2 %f %f %f %f %f %f\n", i, (*m32)[i].xx, (*m32)[i].xy, (*m32)[i].xz, (*m32)[i].yx, (*m32)[i].yy, (*m32)[i].yz);
     }
 
     for(i = 0; i < h->walls; i++) {
-        LOG("%d Wall %p %hhu %hX %p %p\n", i,
-            &(*w)[i], (*w)[i].texture, (*w)[i].shade, (*w)[i].bias, (*w)[i].transform);
+        LOG("%d Wall %hhu %02hX %hu %hu\n", i,
+            (*w)[i].texture, (*w)[i].shade, (*w)[i].bias, (*w)[i].transform);
     }
 
     for(i = 0; i < h->lines; i++) {
-        LOG("%d Line %p %p %p %p %p\n", i,
-            &(*l)[i], (*l)[i].point, (*l)[i].sector,
+        LOG("%d Line %hu %hu %hu %hu\n", i,
+            (*l)[i].point, (*l)[i].sector,
             (*l)[i].wall[CEILING], (*l)[i].wall[FLOOR]);
     }
 
     for(i = 0; i < h->flats; i++) {
-        LOG("%d Wall %p %hhu %hX %p %p\n", i,
-            &(*f)[i], (*f)[i].texture, (*f)[i].shade, (*f)[i].bias, (*f)[i].transform);
+        LOG("%d Wall %hhu %02hX %hu %hu\n", i,
+            (*f)[i].texture, (*f)[i].shade, (*f)[i].bias, (*f)[i].transform);
     }
 
     for(i = 0; i < h->sectors; i++) {
-        LOG("%d Sector %p %f %f %p %p %p %hhu ", i,
-            &(*s)[i], (*s)[i].height[CEILING], (*s)[i].height[FLOOR],
+        LOG("%d Sector %f %f %hu %hu %hu %hhu ", i,
+            (*s)[i].height[CEILING], (*s)[i].height[FLOOR],
             (*s)[i].flat[CEILING], (*s)[i].flat[FLOOR],
             (*s)[i].firstline, (*s)[i].lines);
         switch((*s)[i].action & 0xFF) {
@@ -259,25 +270,27 @@ static void print_data(Header *h) {
         }
     }
 
-    LOG("View %p %f %f %f %f %f %f\n",
+    LOG("View %hu %f %f %f %f %f %f\n",
         v.start, v.pos.x, v.pos.y,
         v.angle, v.startheight, v.height, v.fov);
 }
 
-void apply_view_data(View_data *vd) {
-    v.start = &(*s)[vd->start];
-    v.pos.x = (*p)[vd->pos].x;
-    v.pos.y = (*p)[vd->pos].y;
-    v.angle = vd->angle;
-    v.startheight = vd->startheight;
-    v.fov = vd->fov;
+void apply_view_data(View_data *view) {
+    v.start = &(*s)[view->start];
+    v.pos.x = (*p)[view->pos].x;
+    v.pos.y = (*p)[view->pos].y;
+    v.angle = view->angle;
+    v.startheight = view->startheight;
+    v.fov = view->fov;
 
     /* set the player's world height */
     v.height = v.start->height[FLOOR] + v.startheight;
 }
 
 int engine_load(unsigned char number, unsigned char view) {
+#ifndef EDITOR
     Header h;
+#endif
     Data d;
     int i;
     off_t start = 0;
@@ -295,6 +308,13 @@ int engine_load(unsigned char number, unsigned char view) {
         free(m32);
         free(m22);
         free(p);
+#ifdef EDITOR
+        free(point_refs);
+        free(m22_refs);
+        free(m32_refs);
+        free(wall_refs);
+        free(flat_refs);
+#endif
     }
 
 #ifdef BROKEN_MATH
@@ -345,6 +365,34 @@ int engine_load(unsigned char number, unsigned char view) {
         goto error_flats;
     }
 
+#ifdef EDITOR
+    /* not too worried about freeing these right since it'll just be crashing out after anyway and this isn't for end users anyway */
+    point_refs = malloc(h.points * sizeof(int));
+    if(point_refs == NULL) {
+        goto error_open;
+    }
+
+    m22_refs = malloc(h.matrix2x2s * sizeof(int));
+    if(m22_refs == NULL) {
+        goto error_open;
+    }
+
+    m32_refs = malloc(h.matrix3x2s * sizeof(int));
+    if(m32_refs == NULL) {
+        goto error_open;
+    }
+
+    wall_refs = malloc(h.walls * sizeof(int));
+    if(wall_refs == NULL) {
+        goto error_open;
+    }
+
+    flat_refs = malloc(h.flats * sizeof(int));
+    if(flat_refs == NULL) {
+        goto error_open;
+    }
+#endif
+
     start += sizeof(Header);
     for(i = 0; i < h.points; i++) {
         read_map_p(start + (i * sizeof(Point_data)), sizeof(Point_data), &d.p);
@@ -377,18 +425,27 @@ int engine_load(unsigned char number, unsigned char view) {
         read_map_p(start + (i * sizeof(Wall_data)), sizeof(Wall_data), &d.w);
         (*w)[i].texture = d.w.texture;
         (*w)[i].shade = d.w.shade;
-        (*w)[i].bias = &(*p)[d.w.bias];
-        (*w)[i].transform = &(*m32)[d.w.transform];
+        (*w)[i].bias = d.w.bias;
+        (*w)[i].transform = d.w.transform;
+#ifdef EDITOR
+        point_refs[d.w.bias]++;
+        m32_refs[d.w.transform]++;
+#endif
     }
 
     start += sizeof(Wall_data) * h.walls;
     for(i = 0; i < h.lines; i++) {
         read_map_p(start + (i * sizeof(Line_data)), sizeof(Line_data), &d.l);
-        (*l)[i].point = &(*p)[d.l.point];
+        (*l)[i].point = d.l.point;
         /* sector will be filled when links are read */
-        (*l)[i].sector = NULL;
-        (*l)[i].wall[CEILING] = &(*w)[d.l.wall[CEILING]];
-        (*l)[i].wall[FLOOR] = &(*w)[d.l.wall[FLOOR]];
+        (*l)[i].sector = NO_SECTOR;
+        (*l)[i].wall[CEILING] = d.l.wall[CEILING];
+        (*l)[i].wall[FLOOR] = d.l.wall[FLOOR];
+#ifdef EDITOR
+        point_refs[d.l.point]++;
+        wall_refs[d.l.wall[CEILING]]++;
+        wall_refs[d.l.wall[FLOOR]]++;
+#endif
     }
 
     start += sizeof(Line_data) * h.lines;
@@ -396,8 +453,12 @@ int engine_load(unsigned char number, unsigned char view) {
         read_map_p(start + (i * sizeof(Flat_data)), sizeof(Flat_data), &d.f);
         (*f)[i].texture = d.f.texture;
         (*f)[i].shade = d.f.shade;
-        (*f)[i].bias = &(*p)[d.f.bias];
-        (*f)[i].transform = &(*m22)[d.f.transform];
+        (*f)[i].bias = d.f.bias;
+        (*f)[i].transform = d.f.transform;
+#ifdef EDITOR
+        point_refs[d.w.bias]++;
+        m22_refs[d.w.transform]++;
+#endif
     }
 
     start += sizeof(Flat_data) * h.flats;
@@ -406,20 +467,24 @@ int engine_load(unsigned char number, unsigned char view) {
         d.s.lines += 3; /* 3 lines minimum so 0 is 3 mines */
         (*s)[i].height[CEILING] = d.s.height[CEILING];
         (*s)[i].height[FLOOR] = d.s.height[FLOOR];
-        (*s)[i].flat[CEILING] = &(*f)[d.s.flat[CEILING]];
-        (*s)[i].flat[FLOOR] = &(*f)[d.s.flat[FLOOR]];
-        (*s)[i].firstline = &(*l)[d.s.firstline];
+        (*s)[i].flat[CEILING] = d.s.flat[CEILING];
+        (*s)[i].flat[FLOOR] = d.s.flat[FLOOR];
+        (*s)[i].firstline = d.s.firstline;
         (*s)[i].lines = d.s.lines;
         (*s)[i].action = d.s.action;
+#ifdef EDITOR
+        flat_refs[d.s.flat[CEILING]]++;
+        flat_refs[d.s.flat[FLOOR]]++;
+#endif
     }
 
     start += sizeof(Sector_data) * h.sectors;
     for(i = 0; i < h.links; i++) {
         read_map_p(start + (i * sizeof(Link_data)), sizeof(Link_data), &d.li);
         /* link first sector to second */
-        (*s)[d.li.sector].firstline[d.li.line].sector = &(*s)[d.li.lsector];
+        (*l)[(*s)[d.li.sector].firstline + d.li.line].sector = d.li.lsector;
         /* link second sector to first */
-        (*s)[d.li.lsector].firstline[d.li.lline].sector = &(*s)[d.li.sector];
+        (*l)[(*s)[d.li.lsector].firstline + d.li.lline].sector = d.li.sector;
     }
 
     start += sizeof(Link_data) * h.links;
@@ -564,24 +629,23 @@ int line_hit(Point *p1, Point *p2,
     return(0);
 }
  
-Line *scan_sector(Sector *last_s, Sector *s,
+Line *scan_sector(Sector *last_s, Sector *sector,
                   Point *pos, Point *slope,
                   int vvertical, float vslope,
                   Point *hit) {
-    Point *point;
-    Point *nextpoint;
+    Point *point, *nextpoint;
     Line *line;
     int i;
 
-    point = s->firstline->point;
-    for(i = 0; i < s->lines; i++) {
-        line = &s->firstline[i];
+    point = &(*p)[(*l)[sector->firstline].point];
+    for(i = 0; i < sector->lines; i++) {
+        line = &(*l)[sector->firstline + i];
 
         /* current line spans from the current point to the next line point */
-        nextpoint = s->firstline[(i + 1) % s->lines].point;
+        nextpoint = &(*p)[(*l)[sector->firstline + ((i + 1) % sector->lines)].point];
 
         /* don't check for lines that would look back towards the previous sector */
-        if(last_s != NULL && line->sector == last_s) {
+        if(last_s != NULL && &(*s)[line->sector] == last_s) {
             /* make sure the point used in the next iteration is updated */
             point = nextpoint;
             continue;
@@ -600,11 +664,7 @@ Line *scan_sector(Sector *last_s, Sector *s,
     return NULL;
 }
 
-float get_distance(Point *pos, Point *hit) {
-    return(sqrtf(fabs(powf(hit->y - pos->y, 2.0)) + fabs(powf(hit->x - pos->x, 2.0))));
-}
-
-float get_distance2(Point *pos, Point *hit, Point *slope) {
+float get_distance(Point *pos, Point *hit, Point *slope) {
     if(fabs(slope->x) > fabs(slope->y)) {
         return(fabs((pos->x - hit->x) / slope->x));
     }
@@ -627,7 +687,7 @@ void set_tex(unsigned char num,
     }
 }
 
-void engine_render(unsigned char *pixels, int w, int h, int pitch
+void engine_render(unsigned char *pixels, int width, int height, int pitch
 #ifdef EDITOR
                    , Point *h_point, Line *h_line, Sector *h_sector
 #endif
@@ -676,8 +736,8 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
     unsigned short shade;
     float x_ratio;
 
-    float w_2 = (float)w / 2.0;
-    float h_2 = (float)h / 2.0;
+    float w_2 = (float)width / 2.0;
+    float h_2 = (float)height / 2.0;
     float fov_2 = v.fov / 2.0;
     float sin_angle = sin(v.angle);
     float cos_angle = cos(v.angle);
@@ -687,10 +747,10 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
     age_slots();
 
     /* scale horizontally to keep parallax texture pixels square */
-    x_ratio = (float)w / h;
+    x_ratio = (float)width / height;
 
     /* for each column */
-    for(x = 0; x < w; x++) {
+    for(x = 0; x < width; x++) {
         /* this is probably not right ... */
         offset = (float)(x - w_2) / w_2 * max_offset;
         slope.x = sin_angle + (cos_angle * offset);
@@ -709,7 +769,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
         sector = v.start;
         last_s = NULL;
         top = 0;
-        bottom = h - 1;
+        bottom = height - 1;
         pos.x = v.pos.x;
         pos.y = v.pos.y;
         total_distance = 0.0;
@@ -724,7 +784,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
             }
 
             /* get the distance between the view and hit coordinates */
-            total_distance += get_distance2(&pos, &hit, &slope);
+            total_distance += get_distance(&pos, &hit, &slope);
 
             /* iterate y (angle transformed with FOV to get an angle from screen Y) with height
              * from bottom solving for distance until total distance is reached.
@@ -736,19 +796,19 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
                 /* ceiling is above the view line */
 
                 /* get ceiling texture */
-                if(sector->flat[CEILING]->texture != ceiling_tex) {
-                    ceiling_tex = sector->flat[CEILING]->texture;
+                if((*f)[sector->flat[CEILING]].texture != ceiling_tex) {
+                    ceiling_tex = (*f)[sector->flat[CEILING]].texture;
                     set_tex(ceiling_tex, &ceiling_data, &ceiling_mask, &ceiling_shift, &ceiling_dim);
                 }
  
-                bias.x = sector->flat[CEILING]->bias->x;
-                bias.y = sector->flat[CEILING]->bias->y;
-                transform22 = sector->flat[CEILING]->transform;
-                shade = sector->flat[CEILING]->shade;
+                bias.x = (*p)[(*f)[sector->flat[CEILING]].bias].x;
+                bias.y = (*p)[(*f)[sector->flat[CEILING]].bias].y;
+                transform22 = &(*m22)[(*f)[sector->flat[CEILING]].transform];
+                shade = (*f)[sector->flat[CEILING]].shade;
                 /* silence a warning */
                 wy = 0.0;
                 if(shade & SHADE_PARALLAX) {
-                    wx = (float)x / w * x_ratio * ceiling_dim;
+                    wx = (float)x / width * x_ratio * ceiling_dim;
                     /* apply panning */
                     bias.x += bg_pan * ceiling_dim;
                 }
@@ -762,7 +822,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
                         color = 0x00;
                     } else {
                         if(shade & SHADE_PARALLAX) {
-                            wy = (float)y / h * ceiling_dim;
+                            wy = (float)y / height * ceiling_dim;
                         } else {
                             wx = v.pos.x + (slope.x * z);
                             wy = v.pos.y + (slope.y * z);
@@ -807,19 +867,19 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
             /* draw floor */
             floordiff = sector->height[FLOOR] - v.height;
             if(floordiff < 0.0) {
-                if(sector->flat[FLOOR]->texture != floor_tex) {
-                    floor_tex = sector->flat[FLOOR]->texture;
+                if((*f)[sector->flat[FLOOR]].texture != floor_tex) {
+                    floor_tex = (*f)[sector->flat[FLOOR]].texture;
                     set_tex(floor_tex, &floor_data, &floor_mask, &floor_shift, &floor_dim);
                 }
 
-                bias.x = sector->flat[FLOOR]->bias->x;
-                bias.y = sector->flat[FLOOR]->bias->y;
-                transform22 = sector->flat[FLOOR]->transform;
-                shade = sector->flat[FLOOR]->shade;
+                bias.x = (*p)[(*f)[sector->flat[FLOOR]].bias].x;
+                bias.y = (*p)[(*f)[sector->flat[FLOOR]].bias].y;
+                transform22 = &(*m22)[(*f)[sector->flat[FLOOR]].transform];
+                shade = (*f)[sector->flat[FLOOR]].shade;
                 /* silence a warning */
                 wy = 0.0;
                 if(shade & SHADE_PARALLAX) {
-                    wx = (float)x / w * x_ratio * floor_dim;
+                    wx = (float)x / width * x_ratio * floor_dim;
                     bias.x += bg_pan * floor_dim;
                 }
                 for(y = bottom; y >= 0 && y >= top; y--) {
@@ -832,7 +892,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
                         color = 0x00;
                     } else {
                         if(shade & SHADE_PARALLAX) {
-                            wy = (float)y / h * floor_dim;
+                            wy = (float)y / height * floor_dim;
                         } else {
                             wx = v.pos.x + (slope.x * z);
                             wy = v.pos.y + (slope.y * z);
@@ -874,17 +934,17 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
             }
 
             /* get top wall texture parameters as these'll most likely be needed */
-            if(line->wall[CEILING]->texture != top_line_tex) {
-                top_line_tex = line->wall[CEILING]->texture;
+            if((*w)[line->wall[CEILING]].texture != top_line_tex) {
+                top_line_tex = (*w)[line->wall[CEILING]].texture;
                 set_tex(top_line_tex, &top_line_data, &top_line_mask, &top_line_shift, &top_line_dim);
             }
-            bias.x = line->wall[CEILING]->bias->x;
-            bias.y = line->wall[CEILING]->bias->y;
-            transform32 = line->wall[CEILING]->transform;
-            shade = line->wall[CEILING]->shade;
+            bias.x = (*p)[(*w)[line->wall[CEILING]].bias].x;
+            bias.y = (*p)[(*w)[line->wall[CEILING]].bias].y;
+            transform32 = &(*m32)[(*w)[line->wall[CEILING]].transform];
+            shade = (*w)[line->wall[CEILING]].shade;
             if(shade & SHADE_PARALLAX) {
                 /* calculate screen X position relative to texture res */
-                wx = (float)x / w * x_ratio * top_line_dim;
+                wx = (float)x / width * x_ratio * top_line_dim;
                 /* silence a warning */
                 wy = 0.0;
                 /* Z is unused */
@@ -898,17 +958,17 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
                 wz = 0.0;
             }
 
-            if(line->sector == NULL) {
+            if(line->sector == NO_SECTOR) {
                 /* solid wall, no sector on the other side */
                 for(y = top;
-                    y <= bottom && y < h;
+                    y <= bottom && y < height;
                     y++) {
                     if(top_line_dim == 0) {
                         color = 0x00;
                     } else {
                         if(shade & SHADE_PARALLAX) {
                             /* calculate screen y position */
-                            wy = (float)y / h * top_line_dim;
+                            wy = (float)y / height * top_line_dim;
                         } else {
                             /* calculate height */
                             wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
@@ -958,7 +1018,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
 
             /* get sector on other side of the line while keeping note of the last sector so raycasting won't traverse back through it */
             last_s = sector;
-            sector = line->sector;
+            sector = &(*s)[line->sector];
 
             ceilingdiff = sector->height[CEILING] - v.height;
             next_y = h_2 - (ceilingdiff / total_distance * max_offset * h_2);
@@ -966,13 +1026,13 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
                 /* draw top wall */
                 /* wx and wy should already be set */
                 for(y = top;
-                    y <= next_y && y < h;
+                    y <= next_y && y < height;
                     y++) {
                     if(top_line_dim == 0) {
                         color = 0x00;
                     } else {
                         if(shade & SHADE_PARALLAX) {
-                            wy = (float)y / h * top_line_dim;
+                            wy = (float)y / height * top_line_dim;
                         } else {
                             wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
                         }
@@ -1021,18 +1081,18 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
             next_y = h_2 - (floordiff / total_distance * max_offset * h_2);
             if(next_y < bottom) {
                 /* bottom wall texture will be needed */
-                if(line->wall[FLOOR]->texture != bottom_line_tex) {
-                    bottom_line_tex = line->wall[FLOOR]->texture;
+                if((*w)[line->wall[FLOOR]].texture != bottom_line_tex) {
+                    bottom_line_tex = (*w)[line->wall[FLOOR]].texture;
                     set_tex(bottom_line_tex, &bottom_line_data, &bottom_line_mask, &bottom_line_shift, &bottom_line_dim);
                 }
-                bias.x = line->wall[CEILING]->bias->x;
-                bias.y = line->wall[CEILING]->bias->y;
-                transform32 = line->wall[FLOOR]->transform;
-                shade = line->wall[FLOOR]->shade;
+                bias.x = (*p)[(*w)[line->wall[CEILING]].bias].x;
+                bias.y = (*p)[(*w)[line->wall[CEILING]].bias].y;
+                transform32 = &(*m32)[(*w)[line->wall[FLOOR]].transform];
+                shade = (*w)[line->wall[FLOOR]].shade;
 
                 /* shade can be different, so recalculate */
                 if(shade & SHADE_PARALLAX) {
-                    wx = (float)x / w * x_ratio * top_line_dim;
+                    wx = (float)x / width * x_ratio * top_line_dim;
                     wz = 0.0;
                     bias.x += bg_pan * bottom_line_dim;
                 } else {
@@ -1047,7 +1107,7 @@ void engine_render(unsigned char *pixels, int w, int h, int pitch
                         color = 0x00;
                     } else {
                         if(shade & SHADE_PARALLAX) {
-                            wy = (float)y / h * top_line_dim;
+                            wy = (float)y / height * top_line_dim;
                         } else {
                             wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
                         }
@@ -1216,7 +1276,7 @@ void engine_move(float x, float y,
         /* if wall collided, don't continue to move
          * this isn't intended to be very interactive, so for now, don't bother with real collision
          * detection, just make sure the view can't leave where there're no sectors */
-        if(line->sector == NULL) {
+        if(line->sector == NO_SECTOR) {
             return;
         }
 
@@ -1224,7 +1284,7 @@ void engine_move(float x, float y,
         pos.x = hit.x;
         pos.y = hit.y;
         last_s = sector;
-        sector = line->sector;
+        sector = &(*s)[line->sector];
 
         if(action) {
             if(do_action(sector)) {
@@ -1238,12 +1298,12 @@ void engine_move(float x, float y,
     v.pos.x = dest.x;
     v.pos.y = dest.y;
     v.start = sector;
-    v.height = sector->height[1] + v.startheight;
+    v.height = sector->height[FLOOR] + v.startheight;
 }
 
 #ifdef EDITOR
-int get_hit(unsigned int mx, unsigned int my,
-            unsigned int w, unsigned int h,
+int get_hit(int mx, int my,
+            int width, int height,
             Sector **sector, Line **line,
             float *wx, float *wy, float *wz) {
     Sector *last_s;
@@ -1261,8 +1321,8 @@ int get_hit(unsigned int mx, unsigned int my,
     float floordiff;
     float next_y;
 
-    float w_2 = (float)w / 2.0;
-    float h_2 = (float)h / 2.0;
+    float w_2 = (float)width / 2.0;
+    float h_2 = (float)height / 2.0;
     float fov_2 = v.fov / 2.0;
     float sin_angle = sin(v.angle);
     float cos_angle = cos(v.angle);
@@ -1286,7 +1346,7 @@ int get_hit(unsigned int mx, unsigned int my,
     *sector = v.start;
     last_s = NULL;
     top = 0;
-    bottom = h - 1;
+    bottom = height - 1;
     pos.x = v.pos.x;
     pos.y = v.pos.y;
     total_distance = 0.0;
@@ -1301,7 +1361,7 @@ int get_hit(unsigned int mx, unsigned int my,
         }
 
         /* get the distance between the view and hit coordinates */
-        total_distance += get_distance2(&pos, &hit, &slope);
+        total_distance += get_distance(&pos, &hit, &slope);
 
         /* iterate y (angle transformed with FOV to get an angle from screen Y) with height
          * from bottom solving for distance until total distance is reached.
@@ -1350,10 +1410,10 @@ int get_hit(unsigned int mx, unsigned int my,
         *wx = v.pos.x + (slope.x * total_distance);
         *wy = v.pos.y + (slope.y * total_distance);
 
-        if((*line)->sector == NULL) {
+        if((*line)->sector == NO_SECTOR) {
             /* solid wall, no sector on the other side */
             for(y = top;
-                y <= bottom && y < h;
+                y <= bottom && y < height;
                 y++) {
                 *wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
                 if(y == my) {
@@ -1365,7 +1425,7 @@ int get_hit(unsigned int mx, unsigned int my,
 
         /* get sector on other side of the line while keeping note of the last sector so raycasting won't traverse back through it */
         last_s = *sector;
-        *sector = (*line)->sector;
+        *sector = &(*s)[(*line)->sector];
 
         ceilingdiff = (*sector)->height[CEILING] - v.height;
         next_y = h_2 - (ceilingdiff / total_distance * max_offset * h_2);
@@ -1373,7 +1433,7 @@ int get_hit(unsigned int mx, unsigned int my,
             /* draw top wall */
             /* wx and wy should already be set */
             for(y = top;
-                y <= next_y && y < h;
+                y <= next_y && y < height;
                 y++) {
                 *wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
                 if(y == my) {
@@ -1463,12 +1523,12 @@ Point *get_point(unsigned int x, unsigned int y,
     /* find nearest point */
     /* find point and adjacent point on line in sector */
     for(i = 0; i < sector->lines; i++) {
-        if(line == &(sector->firstline[i])) {
-            p1 = sector->firstline[i].point;
+        if(line == &(*l)[sector->firstline + i]) {
+            p1 = &(*p)[(*l)[sector->firstline + i].point];
             if(i == sector->lines - 1) {
-                p2 = sector->firstline[0].point;
+                p2 = &(*p)[(*l)[sector->firstline].point];
             } else {
-                p2 = sector->firstline[i+1].point;
+                p2 = &(*p)[(*l)[sector->firstline + i + 1].point];
             }
             break;
         }
@@ -1488,6 +1548,144 @@ Point *get_point(unsigned int x, unsigned int y,
 
     /* second point is closer */
     return(p2);
+}
+
+/* adding objects will just be dumb extending arrays by 1 each time */
+/* deleting objects will just be dumb moving everything after the object towards the beginning
+ * then whatever awfulness will be needed to repoint everything */
+/* if add is called with numbers that match an existing object, just increase its refcount
+ * this'll never make maps so big that something like a hash map will be needed, linear search will be fast enough */
+Point *add_point(float x, float y) {
+    Point (*new_p)[];
+    int *new_point_refs;
+    unsigned int i;
+    unsigned int index;
+
+    if(h.points == 0) {
+        /* allocate initial array */
+        p = malloc(sizeof(Point));
+        if(p == NULL) {
+            return(NULL);
+        }
+        (*p)[0].x = x;
+        (*p)[0].y = y;
+        h.points = 1;
+        return(&((*p)[0]));
+    }
+
+    /* try to find the point */
+    for(i = 0; i < h.points; i++) {
+        if((*p)[i].x == x && (*p)[i].y == y) {
+            return(&(*p)[i]);
+        }
+    }
+
+    /* resize array */
+    new_p = realloc(p, (h.points + 1) * sizeof(Point));
+    if(new_p == NULL) {
+        return(NULL);
+    }
+    new_point_refs = realloc(point_refs, (h.points + 1) * sizeof(int));
+    if(new_point_refs == NULL) {
+        return(NULL);
+    }
+    p = new_p;
+    point_refs = new_point_refs;
+
+    (*p)[h.points].x = x;
+    (*p)[h.points].y = y;
+    point_refs[h.points] = 1;
+    h.points++;
+    return(&((*p)[h.points-1]));
+}
+
+void deref_point(Point *point) {
+}
+
+Matrix2x2 *add_matrix2x2(float xx, float xy,
+                         float yx, float yy) {
+}
+
+void deref_matrix2x2(Matrix2x2 *matrix2x2) {
+}
+
+Matrix3x2 *add_matrix3x2(float xx, float xy, float xz,
+                         float yx, float yy, float yz) {
+}
+
+void deref_matrix3x2(Matrix3x2 *matrix3x2) {
+}
+
+Wall *add_wall(unsigned char texture,
+               unsigned short shade,
+               Point *bias,
+               Matrix3x2 *transform) {
+}
+
+void deref_wall(Wall *wall) {
+}
+
+Flat *add_flat(unsigned char texture,
+               unsigned short shade,
+               Point *bias,
+               Matrix2x2 *transform) {
+}
+
+void deref_flat(Flat *flat) {
+}
+
+void split_line(Sector *sector, Line *line) {
+    /* add a point to a line's midpoint */
+}
+
+void join_line(Sector *sector, Line *line, Point *point) {
+    /* delete a point from a line and connecting the 2 points together, decreasing the point refcount and freeing it if needed */
+}
+
+void split_point(Sector *sector, Line *line, Point *point) {
+    /* create a new point for a line sharing a point with another line to freely move it away */
+}
+
+void set_line_bias(Line *line,
+                   float x, float y) {
+}
+
+void set_line_transform(Line *line,
+                        float xx, float xy, float xz,
+                        float yx, float yy, float yz) {
+}
+
+void split_sector(Sector *sector, Point *point1, Point *point2) {
+    /* create a new sector pinched off from a sector */
+}
+
+void link_sectors(Sector *sector1, Line *line, Sector *sector2) {
+    /* link 2 sectors sharing a common line with the same 2 points */
+}
+
+void unlink_sectors(Sector *sector, Line *line) {
+    /* unlink 2 sectors */
+}
+
+void delete_sector(Sector *sector) {
+    /* delete a sector */
+}
+
+void set_sector_bias(Sector *sector,
+                     float x, float y) {
+}
+
+void set_sector_transform(Sector *sector,
+                          float xx, float xy,
+                          float yx, float yy) {
+}
+
+void init_map() {
+    /* set up a square room with no textures and the view in the middle, and initialize point refs */
+    /* free anything first if needed */
+}
+
+int save_file() {
 }
 #endif
 

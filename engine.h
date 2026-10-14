@@ -41,31 +41,31 @@ typedef struct Line_s Line;
 typedef struct {
     unsigned char texture;
     unsigned short shade;
-    Point *bias;
-    Matrix3x2 *transform;
+    unsigned short bias;
+    unsigned short transform;
 } Wall;
 
 typedef struct Line_s {
-    Point *point;
-    Sector *sector;
+    unsigned short point;
+    unsigned short sector;
 
-    Wall *wall[2];
+    unsigned short wall[2];
 } Line;
 
 typedef struct {
     unsigned char texture;
     unsigned short shade;
-    Point *bias;
-    Matrix2x2 *transform;
+    unsigned short bias;
+    unsigned short transform;
 } Flat;
 
 typedef struct Sector_s {
-    Line *firstline;
+    unsigned short firstline;
     unsigned char lines;
 
     float height[2];
 
-    Flat *flat[2];
+    unsigned short flat[2];
 
     unsigned int action;
 } Sector;
@@ -89,7 +89,7 @@ extern read_map_t read_map_p;
 extern close_map_t close_map_p;
 
 int engine_load(unsigned char number, unsigned char view);
-void engine_render(unsigned char *pixels, int w, int h, int pitch
+void engine_render(unsigned char *pixels, int width, int height, int pitch
 #ifdef EDITOR
                    , Point *h_point, Line *h_line, Sector *h_sector
 #endif

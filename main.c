@@ -46,6 +46,9 @@
 #include "log.h"
 #include "cache.h"
 
+/* screen size of the watch minus the bar showing time */
+#define SCREEN_WIDTH (200)
+#define SCREEN_HEIGHT (202)
 /* imprecise, but this is fine */
 #define FRAME_WAIT (20)
 #define MOUSE_SENSITIVITY (0.4)
@@ -183,7 +186,7 @@ int main(int argc, char **argv) {
         goto error;
     }
 
-    window = SDL_CreateWindow("engine", 200, 202, 0);
+    window = SDL_CreateWindow("engine", SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     if(window == NULL) {
         LOG("Failed to create window: %s\n", SDL_GetError());
         goto error_init;
@@ -315,6 +318,7 @@ int main(int argc, char **argv) {
                             break;
                         case SDLK_TAB:
                             target = NEXT_TARGET[target];
+                            redraw = 1;
                             break;
                         case SDLK_ESCAPE:
                         case SDLK_Q:
