@@ -285,7 +285,7 @@ static void text_layer_update(struct Layer *layer, GContext *ctx) {
 }
 
 void select_click_handler(ClickRecognizerRef recognizer, void *context) {
-    engine_move(sin(v.angle) * 10.0, cos(v.angle) * 10.0);
+    engine_move(sin(v.angle) * 10.0, cos(v.angle) * 10.0, 1);
     layer_mark_dirty(s_engine_layer);
 }
 
@@ -309,9 +309,9 @@ void down_click_handler(ClickRecognizerRef recognizer, void *context) {
 }
 
 void config_provider(Window *window) {
-    window_single_repeating_click_subscribe(BUTTON_ID_UP, 100, up_click_handler);
-    window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 100, down_click_handler);
-    window_single_repeating_click_subscribe(BUTTON_ID_SELECT, 100, select_click_handler);
+    window_single_repeating_click_subscribe(BUTTON_ID_UP, 30, up_click_handler);
+    window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 30, down_click_handler);
+    window_single_repeating_click_subscribe(BUTTON_ID_SELECT, 30, select_click_handler);
 }
 
 static void prv_window_load(Window *window) {

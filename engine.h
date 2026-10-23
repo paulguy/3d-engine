@@ -71,7 +71,7 @@ typedef struct Sector_s {
 } Sector;
 
 typedef struct {
-    Sector *start;
+    unsigned short start;
     Point pos;
     float angle;
     float startheight;
@@ -80,10 +80,12 @@ typedef struct {
     float fov;
 } View;
 
+typedef int (* map_exists_t)(unsigned char number);
 typedef int (* open_map_t)(unsigned char number);
 typedef int (* read_map_t)(off_t offset, size_t length, void *data);
 typedef void (* close_map_t)();
 
+extern map_exists_t map_exists_p;
 extern open_map_t open_map_p;
 extern read_map_t read_map_p;
 extern close_map_t close_map_p;
@@ -91,19 +93,20 @@ extern close_map_t close_map_p;
 int engine_load(unsigned char number, unsigned char view);
 void engine_render(unsigned char *pixels, int width, int height, int pitch
 #ifdef EDITOR
-                   , Point *h_point, Line *h_line, Sector *h_sector
+                   , int hl_point, int hl_line, int hl_sector
+                   , int sel_point, int sel_line, int sel_sector
 #endif
         );
 void engine_move(float x, float y,
                  int action);
 
 #ifdef EDITOR
-Sector *get_sector(unsigned int x, unsigned int y,
-                   unsigned int w, unsigned int h);
-Line *get_line(unsigned int x, unsigned int y,
+int get_sector(unsigned int x, unsigned int y,
                unsigned int w, unsigned int h);
-Point *get_point(unsigned int x, unsigned int y,
-                 unsigned int w, unsigned int h);
+int get_line(unsigned int x, unsigned int y,
+             unsigned int w, unsigned int h);
+int get_point(unsigned int x, unsigned int y,
+              unsigned int w, unsigned int h);
 #endif
  
 float sin_lookup_wrapper(float angle);

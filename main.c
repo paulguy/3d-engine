@@ -138,6 +138,16 @@ int open_map(unsigned char number) {
     return(0);
 }
 
+int map_exists(unsigned char number) {
+    if(open_map(number) < 0) {
+        return(0);
+    }
+
+    fclose(mapfile);
+
+    return(1);
+}
+
 int read_map(off_t offset, size_t length, void *data) {
     if(fseek(mapfile, offset, SEEK_SET) < 0) {
         return(-1);
@@ -175,9 +185,12 @@ int main(int argc, char **argv) {
     SDL_MouseMotionEvent *mmevent;
 
     SelectionTarget target = SEL_POINT;
-    Point *h_point = NULL;
-    Line *h_line = NULL;
-    Sector *h_sector = NULL;
+    int h_point = -1;
+    int h_line = -1;
+    int h_sector = -1;
+    int s_point = 1;
+    int s_line = 0;
+    int s_sector = 0;
 
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 
@@ -239,6 +252,7 @@ int main(int argc, char **argv) {
     /* setup wrapper function pointers */
     open_map_p = open_map;
     read_map_p = read_map;
+    map_exists_p = map_exists;
     close_map_p = close_map;
     get_graphic_dim_p = get_graphic_dim;
     load_graphic_p = load_graphic;
@@ -262,9 +276,12 @@ int main(int argc, char **argv) {
             }
 
             engine_render((unsigned char *)(surface->pixels), surface->w, surface->h, surface->pitch,
-                          target == SEL_POINT ? h_point : NULL,
-                          target == SEL_LINE ? h_line : NULL,
-                          target == SEL_SECTOR ? h_sector : NULL);
+                          target == SEL_POINT ? h_point : -1,
+                          target == SEL_LINE ? h_line : -1,
+                          target == SEL_SECTOR ? h_sector : -1,
+                          target == SEL_POINT ? s_point : -1,
+                          target == SEL_LINE ? s_line : -1,
+                          target == SEL_SECTOR ? s_sector : -1);
 
             SDL_UnlockSurface(surface);
 
@@ -364,20 +381,12 @@ int main(int argc, char **argv) {
                     mbevent = (SDL_MouseButtonEvent *)(&event);
                     switch(mbevent->button) {
                         case SDL_BUTTON_LEFT:
-                            switch(target) {
-                                case SEL_SECTOR:
-                                    h_sector = get_sector((unsigned int)mbevent->x, (unsigned int)mbevent->y,
-                                                          surface->w, surface->h);
-                                    break;
-                                case SEL_LINE:
-                                    h_line = get_line((unsigned int)mbevent->x, (unsigned int)mbevent->y,
-                                                      surface->w, surface->h);
-                                    break;
-                                case SEL_POINT:
-                                    h_point = get_point((unsigned int)mbevent->x, (unsigned int)mbevent->y,
-                                                        surface->w, surface->h);
-                                    break;
-                            }
+                            s_sector = get_sector((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                                  surface->w, surface->h);
+                            s_line = get_line((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                              surface->w, surface->h);
+                            s_point = get_point((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                                surface->w, surface->h);
                             redraw = 1;
                             break;
                         case SDL_BUTTON_MIDDLE:
@@ -401,6 +410,20 @@ int main(int argc, char **argv) {
                     break;
                 case SDL_EVENT_MOUSE_MOTION:
                     mmevent = (SDL_MouseMotionEvent *)(&event);
+                    switch(target) {
+                        case SEL_SECTOR:
+                            h_sector = get_sector((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                                  surface->w, surface->h);
+                            break;
+                        case SEL_LINE:
+                            h_line = get_line((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                              surface->w, surface->h);
+                            break;
+                        case SEL_POINT:
+                            h_point = get_point((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                                surface->w, surface->h);
+                            break;
+                    }
                     if(drag_move) {
                         total_move.x = mmevent->xrel;
                         total_move.y = -mmevent->yrel;
@@ -408,6 +431,7 @@ int main(int argc, char **argv) {
                     if(drag_turn) {
                         total_turn = mmevent->xrel * ((float)(FRAME_WAIT) / 1000.0) * M_PI * 2.0 * MOUSE_SENSITIVITY;
                     }
+                    redraw = 1;
                     break;
             }
         }
