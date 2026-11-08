@@ -21,6 +21,28 @@
 #include <sys/types.h>
 #endif
 
+#define CEILING (0)
+#define FLOOR (1)
+
+#define SHADE_SUB (0x100)
+#define SHADE_PARALLAX (0x200)
+
+#define ACTION_NONE (0x00)
+#define ACTION_WARP (0x01)
+#define ACTION_WAYPOINT (0x02)
+
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    unsigned short points;
+    unsigned short matrix2x2s;
+    unsigned short matrix3x2s;
+    unsigned short walls;
+    unsigned short lines;
+    unsigned short flats;
+    unsigned short sectors;
+    unsigned short links;
+    unsigned short views;
+} Header;
+
 typedef struct {
     float x, y;
 } Point;
@@ -101,12 +123,54 @@ void engine_move(float x, float y,
                  int action);
 
 #ifdef EDITOR
+void print_data(Header *h);
+
 int get_sector(unsigned int x, unsigned int y,
                unsigned int w, unsigned int h);
 int get_line(unsigned int x, unsigned int y,
              unsigned int w, unsigned int h);
 int get_point(unsigned int x, unsigned int y,
               unsigned int w, unsigned int h);
+
+/* these shouldn't need to be accessible outside of editor mode */
+extern Header h;
+extern Point (*p)[];
+extern Matrix2x2 (*m22)[];
+extern Matrix3x2 (*m32)[];
+extern Wall (*w)[];
+extern Line (*l)[];
+extern Flat (*f)[];
+extern Sector (*s)[];
+
+int split_line(int sindex, int lindex);
+int join_lines(int sindex, int pindex);
+int set_point(int sindex, int pindex,
+              float x, float y);
+void move_point(int pindex,
+                float x, float y);
+int set_line_texture(int lindex, int which,
+                     unsigned char texture);
+int set_line_shade(int lindex, int which,
+                   unsigned short shade);
+int set_line_bias(int lindex, int which,
+                  float x, float y);
+int set_line_transform(int lindex, int which,
+                       float xx, float xy, float xz,
+                       float yx, float yy, float yz);
+int split_sector(int sindex, int pindex1, int pindex2);
+int join_sectors(int sindex, int lindex);
+int link_sectors(int sindex, int lindex);
+int unlink_sectors(int sindex, int lindex);
+int solidify_sector(int sindex);
+int set_sector_texture(int sindex, int which,
+                       unsigned char texture);
+int set_sector_shade(int sindex, int which,
+                     unsigned short shade);
+int set_sector_bias(int sindex, int which,
+                    float x, float y);
+int set_sector_transform(int sindex, int which,
+                         float xx, float xy,
+                         float yx, float yy);
 #endif
  
 float sin_lookup_wrapper(float angle);

@@ -38,6 +38,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -63,6 +65,12 @@ const SelectionTarget NEXT_TARGET[] = {
     SEL_LINE,
     SEL_SECTOR,
     SEL_POINT
+};
+
+const char *SELECTION_TARGET[] = {
+    "Point",
+    "Line",
+    "Sector"
 };
 
 SDL_Surface *load_png_checked(unsigned char number) {
@@ -164,6 +172,493 @@ void close_map() {
     fclose(mapfile);
 }
 
+typedef void (* prompt_cb_t)(char *str);
+
+prompt_cb_t prompt_cb = NULL;
+
+void start_prompt(prompt_cb_t callback) {
+    fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
+    prompt_cb = callback;
+}
+
+int check_prompt() {
+    char str[256];
+    prompt_cb_t orig_cb;
+    ssize_t ret;
+
+    if(prompt_cb == NULL) {
+        return(0);
+    }
+
+    ret = read(0, str, sizeof(str));
+    if(ret > 0) {
+        str[ret - 1] = '\0';
+        /* let the callback set a next callback */
+        orig_cb = prompt_cb;
+        prompt_cb = NULL;
+        orig_cb(str);
+        fcntl(0, F_SETFL, fcntl(0, F_GETFL) & ~O_NONBLOCK);
+    }
+
+    return(prompt_cb != NULL);
+}
+
+/* point 0 is the no-bias wall scroll */
+int s_point = 1;
+int s_line = 0;
+int s_sector = 0;
+
+typedef void (* select_cb_t)(int sindex, int lindex, int pindex);
+
+select_cb_t select_cb = NULL;
+
+void start_select(select_cb_t callback) {
+    select_cb = callback;
+}
+
+int check_select(int sindex, int lindex, int pindex) {
+    select_cb_t orig_cb;
+
+    if(select_cb != NULL && sindex >= 0) {
+        /* let the callback set a next callback */
+        orig_cb = select_cb;
+        select_cb = NULL;
+        orig_cb(sindex, lindex, pindex);
+    }
+
+    return(select_cb != NULL);
+}
+
+void cancel_input_callbacks() {
+    select_cb = NULL;
+    prompt_cb = NULL;
+    fcntl(0, F_SETFL, fcntl(0, F_GETFL) & ~O_NONBLOCK);
+}
+
+typedef void (* point_cb_t)(float x, float y);
+
+point_cb_t point_cb;
+
+float prompt_x;
+
+void prompt_point_y_cb(char *str) {
+    char *endptr;
+    float prompt_y;
+
+    prompt_y = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    point_cb(prompt_x, prompt_y);
+}
+
+void prompt_point_x_cb(char *str) {
+    char *endptr;
+
+    prompt_x = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    fprintf(stderr, "Point Y: ");
+    start_prompt(prompt_point_y_cb);
+}
+
+void prompt_point(point_cb_t callback) {
+    point_cb = callback;
+    fprintf(stderr, "Point X: ");
+    start_prompt(prompt_point_x_cb);
+}
+
+typedef void (* matrix2x2_cb_t)(float xx, float xy,
+                                float yz, float yy);
+
+matrix2x2_cb_t matrix2x2_cb;
+
+float prompt_xx, prompt_xy, prompt_xz,
+      prompt_yx, prompt_yy;
+
+void prompt_matrix2x2_yy_cb(char *str) {
+    char *endptr;
+
+    prompt_yy = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    matrix2x2_cb(prompt_xx, prompt_xy,
+                 prompt_yx, prompt_yy);
+}
+
+void prompt_matrix2x2_yx_cb(char *str) {
+    char *endptr;
+
+    prompt_yx = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    fprintf(stderr, "Matrix2x2 YY: ");
+    start_prompt(prompt_matrix2x2_yy_cb);
+}
+
+void prompt_matrix2x2_xy_cb(char *str) {
+    char *endptr;
+
+    prompt_xy = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    fprintf(stderr, "Matrix2x2 YX: ");
+    start_prompt(prompt_matrix2x2_yx_cb);
+}
+
+void prompt_matrix2x2_xx_cb(char *str) {
+    char *endptr;
+
+    prompt_xx = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    fprintf(stderr, "Matrix2x2 XY: ");
+    start_prompt(prompt_matrix2x2_xy_cb);
+}
+
+void prompt_matrix2x2(matrix2x2_cb_t callback) {
+    matrix2x2_cb = callback;
+    fprintf(stderr, "Matrix2x2 XX: ");
+    start_prompt(prompt_matrix2x2_xx_cb);
+}
+
+typedef void (* matrix3x2_cb_t)(float xx, float xy, float xz,
+                                float yx, float yy, float yz);
+
+matrix3x2_cb_t matrix3x2_cb;
+
+void prompt_matrix3x2_yz_cb(char *str) {
+    char *endptr;
+    float prompt_yz;
+
+    prompt_yz = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    matrix3x2_cb(prompt_xx, prompt_xy, prompt_xz,
+                 prompt_yx, prompt_yy, prompt_yz);
+}
+
+void prompt_matrix3x2_yy_cb(char *str) {
+    char *endptr;
+
+    prompt_yy = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    fprintf(stderr, "Matrix3x2 YZ: ");
+    start_prompt(prompt_matrix3x2_yz_cb);
+}
+
+void prompt_matrix3x2_yx_cb(char *str) {
+    char *endptr;
+
+    prompt_yx = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    fprintf(stderr, "Matrix3x2 YY: ");
+    start_prompt(prompt_matrix3x2_yy_cb);
+}
+
+void prompt_matrix3x2_xz_cb(char *str) {
+    char *endptr;
+
+    prompt_xz = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    fprintf(stderr, "Matrix3x2 YX: ");
+    start_prompt(prompt_matrix3x2_yx_cb);
+}
+
+void prompt_matrix3x2_xy_cb(char *str) {
+    char *endptr;
+
+    prompt_xy = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    fprintf(stderr, "Matrix3x2 XZ: ");
+    start_prompt(prompt_matrix3x2_xz_cb);
+}
+
+void prompt_matrix3x2_xx_cb(char *str) {
+    char *endptr;
+
+    prompt_xx = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    fprintf(stderr, "Matrix3x2 XY: ");
+    start_prompt(prompt_matrix3x2_xy_cb);
+}
+
+void prompt_matrix3x2(matrix3x2_cb_t callback) {
+    matrix3x2_cb = callback;
+    fprintf(stderr, "Matrix3x2 XX: ");
+    start_prompt(prompt_matrix3x2_xx_cb);
+}
+
+void split_sector_cb(int sindex, int lindex, int pindex) {
+    if(split_sector(s_sector, s_point, pindex) < 0) {
+        fprintf(stderr, "Split sector failed.\n");
+    }
+}
+
+void set_point_cb(float x, float y) {
+    if(set_point(s_sector, s_point, x, y) < 0) {
+        fprintf(stderr, "Set point failed.\n");
+    }
+}
+
+void move_point_cb(float x, float y) {
+    move_point(s_point, x, y);
+}
+
+int action_which;
+
+void prompt_line_texture_cb(char *str) {
+    char *endptr;
+    int texture;
+
+    texture = strtol(str, &endptr, 10);
+    if(endptr == str) {
+        return;
+    }
+
+    if(set_line_texture(s_line, action_which,
+                        texture) < 0) {
+        fprintf(stderr, "Set line texture failed.\n");
+    }
+}
+
+void prompt_sector_texture_cb(char *str) {
+    char *endptr;
+    int texture;
+
+    texture = strtol(str, &endptr, 10);
+    if(endptr == str) {
+        return;
+    }
+
+    if(set_sector_texture(s_sector, action_which,
+                        texture) < 0) {
+        fprintf(stderr, "Set sector texture failed.\n");
+    }
+}
+
+void prompt_line_shade_cb(char *str) {
+    char *endptr;
+    int color;
+    int shade = 0;
+
+    char *num = str;
+
+    if(num[0] == '\n') {
+        return;
+    } else if(num[0] == 'p' || num[0] == 'P') {
+        shade |= SHADE_PARALLAX;
+        num = &num[1];
+    }
+
+    if(num[0] == '\n') {
+        return;
+    } else if(num[0] == '-') {
+        shade |= SHADE_SUB;
+        num = &num[1];
+    }
+
+    /* shades are 0-3, so base 4 */
+    color = strtol(num, &endptr, 4);
+    if(endptr == num) {
+        return;
+    }
+    shade |= (color & 0x03) | ((color & 0x0C) << 1) | ((color & 0x30) << 2);
+
+    if(set_line_shade(s_line, action_which,
+                      shade) < 0) {
+        fprintf(stderr, "Set line shade failed.\n");
+    }
+}
+
+void prompt_sector_shade_cb(char *str) {
+    char *endptr;
+    int shade;
+
+    shade = strtol(str, &endptr, 10);
+    if(endptr == str) {
+        return;
+    }
+
+    if(set_sector_shade(s_sector, action_which,
+                        shade) < 0) {
+        fprintf(stderr, "Set sector shade failed.\n");
+    }
+}
+
+void set_line_bias_cb(float x, float y) {
+    if(set_line_bias(s_line, action_which, x, y) < 0) {
+        fprintf(stderr, "Set line bias failed.\n");
+    }
+}
+
+void set_sector_bias_cb(float x, float y) {
+    if(set_sector_bias(s_sector, action_which, x, y) < 0) {
+        fprintf(stderr, "Set sector bias failed.\n");
+    }
+}
+
+void set_line_transform_cb(float xx, float xy, float xz,
+                           float yx, float yy, float yz) {
+    if(set_line_transform(s_line, action_which,
+                          xx, xy, xz,
+                          yx, yy, yz) < 0) {
+        fprintf(stderr, "Set line transform failed.\n");
+    }
+}
+
+void set_sector_transform_cb(float xx, float xy,
+                             float yx, float yy) {
+    if(set_sector_transform(s_sector, action_which,
+                            xx, xy,
+                            yx, yy) < 0) {
+        fprintf(stderr, "Set sector transform failed.\n");
+    }
+}
+
+void print_view() {
+    fprintf(stderr, "View is at %f, %f looking at %f ", v.pos.x, v.pos.y, v.angle);
+    if(v.angle > (M_PI / 16.0) && v.angle <= (M_PI / 16.0 * 3.0)) {
+        fprintf(stderr, "(between +Y and +X)\n");
+    } else if(v.angle > (M_PI / 8.0 * 3.0) && v.angle <= (M_PI / 8.0 * 5.0)) {
+        fprintf(stderr, "(towards +X)\n");
+    } else if(v.angle > (M_PI / 8.0 * 5.0) && v.angle <= (M_PI / 8.0 * 7.0)) {
+        fprintf(stderr, "(between +X and -Y)\n");
+    } else if(v.angle > (M_PI / 8.0 * 7.0) && v.angle <= (M_PI / 8.0 * 9.0)) {
+        fprintf(stderr, "(towards -Y)\n");
+    } else if(v.angle > (M_PI / 8.0 * 9.0) && v.angle <= (M_PI / 8.0 * 11.0)) {
+        fprintf(stderr, "(between -Y and -X)\n");
+    } else if(v.angle > (M_PI / 8.0 * 11.0) && v.angle <= (M_PI / 8.0 * 13.0)) {
+        fprintf(stderr, "(towards -X)\n");
+    } else if(v.angle > (M_PI / 8.0 * 13.0) && v.angle <= (M_PI / 8.0 * 15.0)) {
+        fprintf(stderr, "(between -X and +Y)\n");
+    } else {
+        fprintf(stderr, "(towards +Y)\n");
+    }
+}
+
+void print_shade(unsigned short shade) {
+    if(shade & SHADE_PARALLAX) {
+        fputc('p', stderr);
+    }
+    if(shade & SHADE_SUB) {
+        fputc('-', stderr);
+    }
+    fprintf(stderr, "%hu%hu%hu", (shade & 0xC0) >> 6,
+                                 (shade & 0x18) >> 3,
+                                 (shade & 0x03));
+}
+
+void print_point(unsigned short pindex) {
+    fprintf(stderr, "Point %hu (%f, %f)\n", pindex, (*p)[pindex].x, (*p)[pindex].y);
+}
+
+void print_line(unsigned short lindex) {
+    unsigned short windex;
+    unsigned short bindex;
+    unsigned short rindex;
+
+    fprintf(stderr, "Line %hu Point: %hu Sector: %hu Ceiling Wall: %hu Floor Wall: %hu\n", lindex,
+            (*l)[lindex].point, (*l)[lindex].sector,
+            (*l)[lindex].wall[CEILING], (*l)[lindex].wall[FLOOR]);
+    windex = (*l)[lindex].wall[CEILING];
+    bindex = (*w)[windex].bias;
+    rindex = (*w)[windex].transform;
+    fprintf(stderr, "Ceiling Wall %hu Texture: %hhu Shade: ", windex,
+            (*w)[windex].texture);
+    print_shade((*w)[windex].shade);
+    fprintf(stderr, " Bias: %hu Transform: %hu\n", bindex, rindex);
+    fprintf(stderr, "Ceiling Bias %hu (%f, %f)\n", bindex, (*p)[bindex].x, (*p)[bindex].y);
+    fprintf(stderr, "Ceiling Matrix3x2 %hu [%f %f %f] [%f %f %f]\n", rindex,
+            (*m32)[rindex].xx, (*m32)[rindex].xy, (*m32)[rindex].xz,
+            (*m32)[rindex].yx, (*m32)[rindex].yy, (*m32)[rindex].yz);
+    windex = (*l)[lindex].wall[FLOOR];
+    bindex = (*w)[windex].bias;
+    rindex = (*w)[windex].transform;
+    fprintf(stderr, "Floor Wall %hu Texture: %hhu Shade: ", windex,
+            (*w)[windex].texture);
+    print_shade((*w)[windex].shade);
+    fprintf(stderr, " Bias: %hu Transform: %hu\n", bindex, rindex);
+    fprintf(stderr, "Floor Bias %hu (%f, %f)\n", bindex, (*p)[bindex].x, (*p)[bindex].y);
+    fprintf(stderr, "Floor Matrix3x2 %hu [%f %f %f] [%f %f %f]\n", rindex,
+            (*m32)[rindex].xx, (*m32)[rindex].xy, (*m32)[rindex].xz,
+            (*m32)[rindex].yx, (*m32)[rindex].yy, (*m32)[rindex].yz);
+}
+
+void print_sector(unsigned short sindex) {
+    unsigned short findex;
+    unsigned short bindex;
+    unsigned short rindex;
+
+    fprintf(stderr, "Sector %hu Ceiling height: %f Floor Height: %f Ceiling Flat: %hu Floor Flat: %hu First Line: %hu Lines: %hhu ", sindex,
+        (*s)[sindex].height[CEILING], (*s)[sindex].height[FLOOR],
+        (*s)[sindex].flat[CEILING], (*s)[sindex].flat[FLOOR],
+        (*s)[sindex].firstline, (*s)[sindex].lines);
+    switch((*s)[sindex].action & 0xFF) {
+        case ACTION_NONE:
+            fprintf(stderr, "None\n");
+            break;
+        case ACTION_WARP:
+            fprintf(stderr, "Warp Map: %hhu View: %hhu\n", ((*s)[sindex].action & 0xFF00) >> 8, ((*s)[sindex].action & 0xFF0000) >> 16);
+            break;
+        case ACTION_WAYPOINT:
+            fprintf(stderr, "Waypoint First Point: %hu Count: %hhu\n", ((*s)[sindex].action & 0xFFFF00) >> 8, ((*s)[sindex].action & 0xFF000000) >> 24);
+            break;
+        default:
+            fprintf(stderr, "Unknown\n");
+    }
+    findex = (*s)[sindex].flat[CEILING];
+    bindex = (*f)[findex].bias;
+    rindex = (*f)[findex].transform;
+    fprintf(stderr, "Ceiling Flat %hu Texture: %hhu Shade: ", findex,
+        (*f)[findex].texture);
+    print_shade((*f)[findex].shade);
+    fprintf(stderr, " Bias: %hu Transform: %hu\n", bindex, rindex);
+    fprintf(stderr, "Ceiling Bias %hu (%f, %f)\n", bindex, (*p)[bindex].x, (*p)[bindex].y);
+    fprintf(stderr, "Ceiling Matrix2x2 %hu [%f %f] [%f %f]\n", rindex,
+            (*m22)[rindex].xx, (*m22)[rindex].xy,
+            (*m22)[rindex].yx, (*m22)[rindex].yy);
+    findex = (*s)[sindex].flat[FLOOR];
+    bindex = (*f)[findex].bias;
+    rindex = (*f)[findex].transform;
+    fprintf(stderr, "Floor Flat %hu Texture: %hhu Shade: ", findex,
+        (*f)[findex].texture);
+    print_shade((*f)[findex].shade);
+    fprintf(stderr, " Bias: %hu Transform: %hu\n", bindex, rindex);
+    fprintf(stderr, "Floor Bias %hu (%f, %f)\n", bindex, (*p)[bindex].x, (*p)[bindex].y);
+    fprintf(stderr, "Floor Matrix2x2 %hu [%f %f] [%f %f]\n", rindex,
+            (*m22)[rindex].xx, (*m22)[rindex].xy,
+            (*m22)[rindex].yx, (*m22)[rindex].yy);
+}
+
 int main(int argc, char **argv) {
     SDL_Window *window;
     SDL_Surface *win_surf;
@@ -171,7 +666,6 @@ int main(int argc, char **argv) {
     SDL_Palette *palette;
     int r, g, b;
     int running = 1;
-    int redraw = 1;
     int turning = 0;
     int move = 0;
     int strafe = 0;
@@ -183,14 +677,25 @@ int main(int argc, char **argv) {
     SDL_Event event;
     SDL_MouseButtonEvent *mbevent;
     SDL_MouseMotionEvent *mmevent;
+    int mapnum = 0;
+    int viewnum = 0;
+    Point cursor = {0};
+    Point *point;
+    Matrix2x2 *matrix2x2;
+    Matrix3x2 *matrix3x2;
+    int ret;
+
+    if(argc > 1) {
+        mapnum = strtol(argv[1], NULL, 10);
+        if(argc > 2) {
+            viewnum = strtol(argv[2], NULL, 10);
+        }
+    }
 
     SelectionTarget target = SEL_POINT;
     int h_point = -1;
     int h_line = -1;
     int h_sector = -1;
-    int s_point = 1;
-    int s_line = 0;
-    int s_sector = 0;
 
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 
@@ -262,31 +767,26 @@ int main(int argc, char **argv) {
         LOG("Failed to allocate texture memory.\n");
         goto error_init;
     }
-    /* map 0 view 0 */
-    engine_load(0, 0);
+    engine_load(mapnum, viewnum);
 
     log_quiet = 0;
 
     while(running) {
-        if(redraw) {
-            SDL_ClearSurface(surface, 0, 0, 0, 0);
+        SDL_ClearSurface(surface, 0, 0, 0, 0);
 
-            if(!SDL_LockSurface(surface)) {
-                LOG("Failed to lock surface: %s\n", SDL_GetError());
-            }
-
-            engine_render((unsigned char *)(surface->pixels), surface->w, surface->h, surface->pitch,
-                          target == SEL_POINT ? h_point : -1,
-                          target == SEL_LINE ? h_line : -1,
-                          target == SEL_SECTOR ? h_sector : -1,
-                          target == SEL_POINT ? s_point : -1,
-                          target == SEL_LINE ? s_line : -1,
-                          target == SEL_SECTOR ? s_sector : -1);
-
-            SDL_UnlockSurface(surface);
-
-            redraw = 0;
+        if(!SDL_LockSurface(surface)) {
+            LOG("Failed to lock surface: %s\n", SDL_GetError());
         }
+
+        engine_render((unsigned char *)(surface->pixels), surface->w, surface->h, surface->pitch,
+                      target == SEL_POINT ? h_point : -1,
+                      target == SEL_LINE ? h_line : -1,
+                      target == SEL_SECTOR ? h_sector : -1,
+                      target == SEL_POINT ? s_point : -1,
+                      target == SEL_LINE ? s_line : -1,
+                      target == SEL_SECTOR ? s_sector : -1);
+
+        SDL_UnlockSurface(surface);
 
         if(!SDL_BlitSurface(surface, NULL, win_surf, NULL)) {
             LOG("Failed to blit surface: %s\n", SDL_GetError());
@@ -301,7 +801,12 @@ int main(int argc, char **argv) {
         total_turn = 0.0;
         total_move.x = 0.0;
         total_move.y = 0.0;
+
+        /* do this even if there's no events */
+        check_prompt();
+
         while(SDL_PollEvent(&event)) {
+            /* general inputs that always happen */
             switch(event.type) {
                 case SDL_EVENT_QUIT:
                     running = 0;
@@ -326,23 +831,21 @@ int main(int argc, char **argv) {
                         case SDLK_D:
                             strafe = 1;
                             break;
-                        case SDLK_L:
-                            log_quiet = !log_quiet;
-                            if(!log_quiet) {
-                                fprintf(stderr, "\n");
-                                redraw = 1;
-                            }
-                            break;
-                        case SDLK_TAB:
-                            target = NEXT_TARGET[target];
-                            redraw = 1;
-                            break;
-                        case SDLK_ESCAPE:
                         case SDLK_Q:
                             running = 0;
                             break;
-                        default:
-                            continue;
+                        case SDLK_P:
+                            print_data(&h);
+                            break;
+                        case SDLK_I:
+                            if(target == SEL_POINT) {
+                                print_point(h_point);
+                            } else if(target == SEL_LINE) {
+                                print_line(h_line);
+                            } else if(target == SEL_SECTOR) {
+                                print_sector(h_sector);
+                            }
+                            break;
                     }
 
                     if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_SHIFT) {
@@ -357,7 +860,6 @@ int main(int argc, char **argv) {
                             strafe = -10;
                         }
                     }
-
                     break;
                 case SDL_EVENT_KEY_UP:
                     switch(((SDL_KeyboardEvent *)&event)->key) {
@@ -380,15 +882,6 @@ int main(int argc, char **argv) {
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
                     mbevent = (SDL_MouseButtonEvent *)(&event);
                     switch(mbevent->button) {
-                        case SDL_BUTTON_LEFT:
-                            s_sector = get_sector((unsigned int)mbevent->x, (unsigned int)mbevent->y,
-                                                  surface->w, surface->h);
-                            s_line = get_line((unsigned int)mbevent->x, (unsigned int)mbevent->y,
-                                              surface->w, surface->h);
-                            s_point = get_point((unsigned int)mbevent->x, (unsigned int)mbevent->y,
-                                                surface->w, surface->h);
-                            redraw = 1;
-                            break;
                         case SDL_BUTTON_MIDDLE:
                             drag_move = 1;
                             break;
@@ -410,19 +903,15 @@ int main(int argc, char **argv) {
                     break;
                 case SDL_EVENT_MOUSE_MOTION:
                     mmevent = (SDL_MouseMotionEvent *)(&event);
-                    switch(target) {
-                        case SEL_SECTOR:
-                            h_sector = get_sector((unsigned int)mbevent->x, (unsigned int)mbevent->y,
-                                                  surface->w, surface->h);
-                            break;
-                        case SEL_LINE:
-                            h_line = get_line((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                    /* only try to update highlight if the cursor is in the window */
+                    if(mmevent->x > 0 && mmevent->x < surface->w &&
+                       mmevent->y > 0 && mmevent->y < surface->h) {
+                        h_sector = get_sector((unsigned int)mmevent->x, (unsigned int)mmevent->y,
                                               surface->w, surface->h);
-                            break;
-                        case SEL_POINT:
-                            h_point = get_point((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                        h_line = get_line((unsigned int)mmevent->x, (unsigned int)mmevent->y,
+                                          surface->w, surface->h);
+                        h_point = get_point((unsigned int)mmevent->x, (unsigned int)mmevent->y,
                                                 surface->w, surface->h);
-                            break;
                     }
                     if(drag_move) {
                         total_move.x = mmevent->xrel;
@@ -431,8 +920,189 @@ int main(int argc, char **argv) {
                     if(drag_turn) {
                         total_turn = mmevent->xrel * ((float)(FRAME_WAIT) / 1000.0) * M_PI * 2.0 * MOUSE_SENSITIVITY;
                     }
-                    redraw = 1;
+                    cursor.x = mmevent->x;
+                    cursor.y = mmevent->y;
                     break;
+            }
+
+            if(!check_select(-1, -1, -1) && !check_prompt()) {
+                /* only when not waiting on a specific input */
+
+                switch(event.type) {
+                    case SDL_EVENT_KEY_DOWN:
+                        switch(((SDL_KeyboardEvent *)&event)->key) {
+                            case SDLK_J:
+                                /* joining */
+                                if(target == SEL_POINT) {
+                                    ret = join_lines(s_sector, s_point);
+                                    if(ret < 0) {
+                                        fprintf(stderr, "Join lines failed.\n");
+                                    } else {
+                                        h_line = ret;
+                                        s_line = ret;
+                                        h_point = (*l)[ret].point;
+                                        s_point = h_point;
+                                    }
+                                } else if(target == SEL_LINE) {
+                                    if(join_sectors(s_sector, s_line) < 0) {
+                                        fprintf(stderr, "Join sectors failed.\n");
+                                    }
+                                }
+                                break;
+                            case SDLK_X:
+                                /* splitting */
+                                if(target == SEL_POINT) {
+                                    fprintf(stderr, "Select other point to make line splitting sector.\n");
+                                    start_select(split_sector_cb);
+                                } else if(target == SEL_LINE) {
+                                    if(split_line(s_sector, s_line) < 0) {
+                                        fprintf(stderr, "Split line failed.\n");
+                                    }
+                                }
+                                break;
+                            case SDLK_L:
+                                /* linking */
+                                if(target == SEL_LINE) {
+                                    if(link_sectors(s_sector, s_line) < 0) {
+                                        fprintf(stderr, "Link sectors failed.\n");
+                                    }
+                                }
+                                break;
+                            case SDLK_U:
+                                /* unlinking */
+                                if(target == SEL_LINE) {
+                                    if(unlink_sectors(s_sector, s_line) < 0) {
+                                        fprintf(stderr, "Unlink sectors failed.\n");
+                                    }
+                                }
+                                break;
+                            case SDLK_M:
+                                /* moving */
+                                if(target == SEL_POINT) {
+                                    if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_SHIFT) {
+                                        fprintf(stderr, "Set Point: Point is at %f, %f.\n", (*p)[s_point].x, (*p)[s_point].y);
+                                        print_view();
+                                        prompt_point(set_point_cb);
+                                    } else {
+                                        fprintf(stderr, "Move Point: Point is at %f, %f.\n", (*p)[s_point].x, (*p)[s_point].y);
+                                        print_view();
+                                        prompt_point(move_point_cb);
+                                    }
+                                }
+                                break;
+                            case SDLK_S:
+                                /* solidify */
+                                if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
+                                    if(target == SEL_SECTOR) {
+                                        if(solidify_sector(s_sector) < 0) {
+                                            fprintf(stderr, "Solidify sector failed.\n");
+                                        }
+                                    }
+                                }
+                                break;
+                            case SDLK_T:
+                                /* texture */
+                                action_which = cursor.y < surface->h / 2 ? CEILING : FLOOR;
+                                if(target == SEL_LINE) {
+                                    fprintf(stderr, "Set line texture: Texture is %hhu.\n", (*w)[(*l)[s_line].wall[action_which]].texture);
+                                    start_prompt(prompt_line_texture_cb);
+                                } else if(target == SEL_SECTOR) {
+                                    fprintf(stderr, "Set sector texture: Texture is %hhu.\n", (*f)[(*s)[s_sector].flat[action_which]].texture);
+                                    start_prompt(prompt_sector_texture_cb);
+                                }
+                                break;
+                            case SDLK_H:
+                                /* shade */
+                                action_which = cursor.y < surface->h / 2 ? CEILING : FLOOR;
+                                if(target == SEL_LINE) {
+                                    fprintf(stderr, "Set line shade: Shade is ");
+                                    print_shade((*w)[(*l)[s_line].wall[action_which]].shade);
+                                    fprintf(stderr, ".\n");
+                                    start_prompt(prompt_line_shade_cb);
+                                } else if(target == SEL_SECTOR) {
+                                    fprintf(stderr, "Set sector shade: Shade is ");
+                                    print_shade((*f)[(*s)[s_sector].flat[action_which]].shade);
+                                    fprintf(stderr, ".\n");
+                                    start_prompt(prompt_sector_shade_cb);
+                                }
+                                break;
+                            case SDLK_B:
+                                /* bias */
+                                action_which = cursor.y < surface->h / 2 ? CEILING : FLOOR;
+                                if(target == SEL_LINE) {
+                                    point = &(*p)[(*w)[(*l)[s_line].wall[action_which]].bias];
+                                    fprintf(stderr, "Set line bias: Bias is %f, %f.\n", point->x, point->y);
+                                    print_view();
+                                    prompt_point(set_line_bias_cb);
+                                } else if(target == SEL_SECTOR) {
+                                    point = &(*p)[(*f)[(*s)[s_sector].flat[action_which]].bias];
+                                    fprintf(stderr, "Set line bias: Bias is %f, %f.\n", point->x, point->y);
+                                    print_view();
+                                    prompt_point(set_sector_bias_cb);
+                                }
+                                break;
+                            case SDLK_R:
+                                /* transform */
+                                action_which = cursor.y < surface->h / 2 ? CEILING : FLOOR;
+                                if(target == SEL_LINE) {
+                                    matrix3x2 = &(*m32)[(*w)[(*l)[s_line].wall[action_which]].transform];
+                                    fprintf(stderr, "Set line transform: Transform is [%f, %f, %f] [%f, %f, %f] .\n",
+                                                    matrix3x2->xx, matrix3x2->xy, matrix3x2->xz,
+                                                    matrix3x2->yx, matrix3x2->yy, matrix3x2->yz);
+                                    print_view();
+                                    prompt_matrix3x2(set_line_transform_cb);
+                                } else if(target == SEL_SECTOR) {
+                                    matrix2x2 = &(*m22)[(*f)[(*s)[s_sector].flat[action_which]].transform];
+                                    fprintf(stderr, "Set sector transform: Transform is [%f, %f] [%f, %f] .\n",
+                                                    matrix2x2->xx, matrix2x2->xy,
+                                                    matrix2x2->yx, matrix2x2->yy);
+                                    print_view();
+                                    prompt_matrix2x2(set_sector_transform_cb);
+                                }
+                                break;
+                            case SDLK_TAB:
+                                target = NEXT_TARGET[target];
+                                fprintf(stderr, "Selection target: %s\n", SELECTION_TARGET[target]);
+                                break;
+                            default:
+                                continue;
+                        }
+                        break;
+                    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                        mbevent = (SDL_MouseButtonEvent *)(&event);
+                        switch(mbevent->button) {
+                            case SDL_BUTTON_LEFT:
+                                s_sector = get_sector((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                                      surface->w, surface->h);
+                                s_line = get_line((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                                  surface->w, surface->h);
+                                s_point = get_point((unsigned int)mbevent->x, (unsigned int)mbevent->y,
+                                                    surface->w, surface->h);
+                                break;
+                        }
+                        break;
+                }
+            } else {
+                /* only when waiting on an input */
+
+                switch(event.type) {
+                    case SDL_EVENT_KEY_DOWN:
+                        switch(((SDL_KeyboardEvent *)&event)->key) {
+                            case SDLK_ESCAPE:
+                                cancel_input_callbacks();
+                                fprintf(stderr, "Input prompts or selections canceled.\n");
+                                break;
+                        }
+                        break;
+                    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                        mbevent = (SDL_MouseButtonEvent *)(&event);
+                        switch(mbevent->button) {
+                            case SDL_BUTTON_LEFT:
+                                check_select(h_sector, h_line, h_point);
+                                break;
+                        }
+                        break;
+                }
             }
         }
 
@@ -459,14 +1129,12 @@ int main(int argc, char **argv) {
             if(v.angle < 0.0) {
                 v.angle += M_PI * 2.0;
             }
-            redraw = 1;
         }
 
         if(total_move.x != 0.0 || total_move.y != 0.0) {
             engine_move(sin(v.angle) * total_move.y + sin(v.angle + M_PI / 2.0) * total_move.x,
                         cos(v.angle) * total_move.y + cos(v.angle + M_PI / 2.0) * total_move.x,
                         action);
-            redraw = 1;
         }
     }
 

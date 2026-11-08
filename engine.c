@@ -96,16 +96,6 @@
 
 #define FOV (60.0 / 360.0 * (M_PI * 2.0))
 
-#define CEILING (0)
-#define FLOOR (1)
-
-#define ACTION_NONE (0x00)
-#define ACTION_WARP (0x01)
-#define ACTION_WAYPOINT (0x02)
-
-#define SHADE_SUB (0x100)
-#define SHADE_PARALLAX (0x200)
-
 #define HIGHLIGHT_DENSITY (4)
 #define HIGHLIGHT_LINE_THICKNESS (2.0)
 #define HIGHLIGHT_PHASE (0)
@@ -114,18 +104,6 @@
 #define NO_SECTOR (0xFFFF)
 
 /* these are all packed in the file, so very efficient access isn't necessary */
-
-typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
-    unsigned short points;
-    unsigned short matrix2x2s;
-    unsigned short matrix3x2s;
-    unsigned short walls;
-    unsigned short lines;
-    unsigned short flats;
-    unsigned short sectors;
-    unsigned short links;
-    unsigned short views;
-} Header;
 
 typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
     float x, y;
@@ -226,7 +204,10 @@ open_map_t open_map_p;
 read_map_t read_map_p;
 close_map_t close_map_p;
 
-static void print_data(Header *h) {
+#ifndef EDITOR
+static
+#endif
+void print_data(Header *h) {
     int i;
 
     LOG("%hu %hu %hu %hu %hu %hu %hu\n", h->points, h->matrix2x2s, h->matrix3x2s, h->lines, h->sectors, h->links, h->views);
@@ -1585,8 +1566,13 @@ int get_hit(int mx, int my,
 
         pos.x = hit.x;
         pos.y = hit.y;
+
+        *sindex = line->sector;
     }
 
+    /* this can be a useful message, but it's noisy 
+    fprintf(stderr, "Hit missed!\n");
+    */
     return(-1);
 }
 
@@ -1606,7 +1592,7 @@ int get_sector(unsigned int x, unsigned int y,
 }
 
 int get_line(unsigned int x, unsigned int y,
-               unsigned int w, unsigned int h) {
+             unsigned int w, unsigned int h) {
     int sindex, lindex;
     float wx;
     float wy;
@@ -1625,7 +1611,7 @@ int get_point(unsigned int x, unsigned int y,
     int sindex, lindex;
     Sector *sector;
     Line *line;
-    unsigned short pindex1, pindex2;
+    unsigned short pindex1 = 0, pindex2 = 0;
     Point *point1 = NULL, *point2;
     float wx;
     float wy;
@@ -1649,9 +1635,8 @@ int get_point(unsigned int x, unsigned int y,
             break;
         }
     }
-
     if(point1 == NULL) {
-        /* no reason this should happen but prevent a potential crash due to bug */
+        fprintf(stderr, "Couldn't find line in sector for point!  This is a bug.\n");
         return(-1);
     }
 
@@ -1673,39 +1658,26 @@ int add_point(float x, float y) {
     int *new_point_refs;
     unsigned int i;
 
-    if(h.points == 0) {
-        /* allocate initial arrays */
-        p = malloc(sizeof(Point));
-        if(p == NULL) {
-            return(-1);
-        }
-        point_refs = malloc(sizeof(int));
-        if(point_refs == NULL) {
-            return(-1);
-        }
-        (*p)[0].x = x;
-        (*p)[0].y = y;
-        h.points = 1;
-        point_refs[0] = 1;
-        return(0);
-    }
-
-    /* try to find the point */
-    for(i = 0; i < h.points; i++) {
-        if((*p)[i].x == x && (*p)[i].y == y) {
-            point_refs[i]++;
-            return(i);
+    if(h.points > 0) {
+        /* try to find the point */
+        for(i = 0; i < h.points; i++) {
+            if((*p)[i].x == x && (*p)[i].y == y) {
+                point_refs[i]++;
+                return(i);
+            }
         }
     }
 
     /* resize array */
     new_p = realloc(p, (h.points + 1) * sizeof(Point));
     if(new_p == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     p = new_p;
     new_point_refs = realloc(point_refs, (h.points + 1) * sizeof(int));
     if(new_point_refs == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     point_refs = new_point_refs;
@@ -1750,11 +1722,13 @@ int deref_point(int pindex) {
         /* resize the arrays */
         new_p = realloc(p, (h.points - 1) * sizeof(Point));
         if(new_p == NULL) {
+            fprintf(stderr, "realloc() failed\n");
             return(-1);
         }
         p = new_p;
         new_point_refs = realloc(point_refs, (h.points - 1) * sizeof(int));
         if(new_point_refs == NULL) {
+            fprintf(stderr, "realloc() failed\n");
             return(-1);
         }
         point_refs = new_point_refs;
@@ -1784,6 +1758,9 @@ int modify_point(int pindex,
     /* otherwise, try adding a new point with the new value,
      * if it's found, it'll have its refcount increased */
     new_pindex = add_point(x, y);
+    if(new_pindex < 0) {
+        return(-1);
+    }
     /* dereference the old point */
     deref_point(pindex);
 
@@ -1796,42 +1773,27 @@ int add_matrix2x2(float xx, float xy,
     int *new_m22_refs;
     unsigned int i;
 
-    if(h.matrix2x2s == 0) {
-        /* allocate initial arrays */
-        m22 = malloc(sizeof(Matrix2x2));
-        if(m22 == NULL) {
-            return(-1);
-        }
-        m22_refs = malloc(sizeof(int));
-        if(m22_refs == NULL) {
-            return(-1);
-        }
-        (*m22)[0].xx = xx;
-        (*m22)[0].xy = xy;
-        (*m22)[0].yx = yx;
-        (*m22)[0].yy = yy;
-        h.matrix2x2s = 1;
-        m22_refs[0] = 1;
-        return(0);
-    }
-
-    /* try to find the point */
-    for(i = 0; i < h.matrix2x2s; i++) {
-        if((*m22)[i].xx == xx && (*m22)[i].xy == xy &&
-           (*m22)[i].yx == yx && (*m22)[i].yy == yy) {
-            m22_refs[i]++;
-            return(i);
+    if(h.matrix2x2s > 0) {
+        /* try to find the point */
+        for(i = 0; i < h.matrix2x2s; i++) {
+            if((*m22)[i].xx == xx && (*m22)[i].xy == xy &&
+               (*m22)[i].yx == yx && (*m22)[i].yy == yy) {
+                m22_refs[i]++;
+                return(i);
+            }
         }
     }
 
     /* resize array */
     new_m22 = realloc(m22, (h.matrix2x2s + 1) * sizeof(Matrix2x2));
     if(new_m22 == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     m22 = new_m22;
     new_m22_refs = realloc(m22_refs, (h.matrix2x2s + 1) * sizeof(int));
     if(new_m22_refs == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     m22_refs = new_m22_refs;
@@ -1866,11 +1828,13 @@ int deref_matrix2x2(int m22index) {
         /* resize the arrays */
         new_m22 = realloc(m22, (h.matrix2x2s - 1) * sizeof(Matrix2x2));
         if(new_m22 == NULL) {
+            fprintf(stderr, "realloc() failed\n");
             return(-1);
         }
         m22 = new_m22;
         new_m22_refs = realloc(m22_refs, (h.matrix2x2s - 1) * sizeof(int));
         if(new_m22_refs == NULL) {
+            fprintf(stderr, "realloc() failed\n");
             return(-1);
         }
         m22_refs = new_m22_refs;
@@ -1905,6 +1869,9 @@ int modify_matrix2x2(int m22index,
      * if it's found, it'll have its refcount increased */
     new_m22index = add_matrix2x2(xx, xy,
                                  yx, yy);
+    if(new_m22index < 0) {
+        return(-1);
+    }
     /* dereference the old matrix2x2 */
     deref_matrix2x2(m22index);
 
@@ -1917,44 +1884,27 @@ int add_matrix3x2(float xx, float xy, float xz,
     int *new_m32_refs;
     unsigned int i;
 
-    if(h.matrix3x2s == 0) {
-        /* allocate initial arrays */
-        m32 = malloc(sizeof(Matrix3x2));
-        if(m32 == NULL) {
-            return(-1);
-        }
-        m32_refs = malloc(sizeof(int));
-        if(m32_refs == NULL) {
-            return(-1);
-        }
-        (*m32)[0].xx = xx;
-        (*m32)[0].xy = xy;
-        (*m32)[0].xz = xz;
-        (*m32)[0].yx = yx;
-        (*m32)[0].yy = yy;
-        (*m32)[0].yz = yz;
-        h.matrix3x2s = 1;
-        m32_refs[0] = 1;
-        return(0);
-    }
-
-    /* try to find the point */
-    for(i = 0; i < h.matrix3x2s; i++) {
-        if((*m32)[i].xx == xx && (*m32)[i].xy == xy && (*m32)[i].xz == xz &&
-           (*m32)[i].yx == yx && (*m32)[i].yy == yy && (*m32)[i].yz == yz) {
-            m32_refs[i]++;
-            return(i);
+    if(h.matrix3x2s > 0) {
+        /* try to find the point */
+        for(i = 0; i < h.matrix3x2s; i++) {
+            if((*m32)[i].xx == xx && (*m32)[i].xy == xy && (*m32)[i].xz == xz &&
+               (*m32)[i].yx == yx && (*m32)[i].yy == yy && (*m32)[i].yz == yz) {
+                m32_refs[i]++;
+                return(i);
+            }
         }
     }
 
     /* resize array */
     new_m32 = realloc(m32, (h.matrix3x2s + 1) * sizeof(Matrix3x2));
     if(new_m32 == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     m32 = new_m32;
     new_m32_refs = realloc(m32_refs, (h.matrix3x2s + 1) * sizeof(int));
     if(new_m32_refs == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     m32_refs = new_m32_refs;
@@ -1991,11 +1941,13 @@ int deref_matrix3x2(int m32index) {
         /* resize the arrays */
         new_m32 = realloc(m32, (h.matrix3x2s - 1) * sizeof(Matrix3x2));
         if(new_m32 == NULL) {
+            fprintf(stderr, "realloc() failed\n");
             return(-1);
         }
         m32 = new_m32;
         new_m32_refs = realloc(m32_refs, (h.matrix3x2s - 1) * sizeof(int));
         if(new_m32_refs == NULL) {
+            fprintf(stderr, "realloc() failed\n");
             return(-1);
         }
         m32_refs = new_m32_refs;
@@ -2032,6 +1984,9 @@ int modify_matrix3x2(int m32index,
      * if it's found, it'll have its refcount increased */
     new_m32index = add_matrix3x2(xx, xy, xz,
                                  yx, yy, yz);
+    if(new_m32index < 0) {
+        return(-1);
+    }
     /* dereference the old matrix3x2 */
     deref_matrix3x2(m32index);
 
@@ -2046,51 +2001,36 @@ int add_wall(unsigned char texture,
     int *new_wall_refs;
     unsigned int i;
 
-    if(h.walls == 0) {
-        /* allocate initial arrays */
-        w = malloc(sizeof(Wall));
-        if(w == NULL) {
-            return(-1);
-        }
-        wall_refs = malloc(sizeof(int));
-        if(wall_refs == NULL) {
-            return(-1);
-        }
-        (*w)[0].texture = texture;
-        (*w)[0].shade = shade;
-        (*w)[0].bias = bias;
-        (*w)[0].transform = transform;
-        h.walls = 1;
-        wall_refs[0] = 1;
-        return(0);
-    }
-
-    /* try to find the point */
-    for(i = 0; i < h.walls; i++) {
-        if((*w)[i].texture == texture &&
-           (*w)[i].shade == shade &&
-           (*w)[i].bias == bias &&
-           (*w)[i].transform == transform) {
-            wall_refs[i]++;
-            return(i);
+    if(h.walls > 0) {
+        /* try to find the point */
+        for(i = 0; i < h.walls; i++) {
+            if((*w)[i].texture == texture &&
+               (*w)[i].shade == shade &&
+               (*w)[i].bias == bias &&
+               (*w)[i].transform == transform) {
+                wall_refs[i]++;
+                return(i);
+            }
         }
     }
 
     /* resize array */
     new_w = realloc(w, (h.walls + 1) * sizeof(Wall));
     if(new_w == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     w = new_w;
     new_wall_refs = realloc(wall_refs, (h.walls + 1) * sizeof(int));
     if(new_wall_refs == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     wall_refs = new_wall_refs;
-    (*w)[i].texture = texture;
-    (*w)[i].shade = shade;
-    (*w)[i].bias = bias;
-    (*w)[i].transform = transform;
+    (*w)[h.walls].texture = texture;
+    (*w)[h.walls].shade = shade;
+    (*w)[h.walls].bias = bias;
+    (*w)[h.walls].transform = transform;
     wall_refs[h.walls] = 1;
     h.walls++;
     return(h.walls-1);
@@ -2120,11 +2060,13 @@ int deref_wall(int windex) {
         /* resize the arrays */
         new_w = realloc(w, (h.walls - 1) * sizeof(Wall));
         if(new_w == NULL) {
+            fprintf(stderr, "realloc() failed\n");
             return(-1);
         }
         w = new_w;
         new_wall_refs = realloc(wall_refs, (h.walls - 1) * sizeof(int));
         if(new_wall_refs == NULL) {
+            fprintf(stderr, "realloc() failed\n");
             return(-1);
         }
         wall_refs = new_wall_refs;
@@ -2162,6 +2104,9 @@ int modify_wall(int windex,
     /* otherwise, try adding a new point with the new value,
      * if it's found, it'll have its refcount increased */
     new_windex = add_wall(texture, shade, bias, transform);
+    if(new_windex < 0) {
+        return(-1);
+    }
     /* dereference the old wall */
     deref_wall(windex);
 
@@ -2176,51 +2121,36 @@ int add_flat(unsigned char texture,
     int *new_flat_refs;
     unsigned int i;
 
-    if(h.flats == 0) {
-        /* allocate initial arrays */
-        f = malloc(sizeof(Flat));
-        if(f == NULL) {
-            return(-1);
-        }
-        flat_refs = malloc(sizeof(int));
-        if(flat_refs == NULL) {
-            return(-1);
-        }
-        (*f)[0].texture = texture;
-        (*f)[0].shade = shade;
-        (*f)[0].bias = bias;
-        (*f)[0].transform = transform;
-        h.flats = 1;
-        flat_refs[0] = 1;
-        return(0);
-    }
-
-    /* try to find the point */
-    for(i = 0; i < h.flats; i++) {
-        if((*f)[i].texture == texture &&
-           (*f)[i].shade == shade &&
-           (*f)[i].bias == bias &&
-           (*f)[i].transform == transform) {
-            flat_refs[i]++;
-            return(i);
+    if(h.flats > 0) {
+        /* try to find the point */
+        for(i = 0; i < h.flats; i++) {
+            if((*f)[i].texture == texture &&
+               (*f)[i].shade == shade &&
+               (*f)[i].bias == bias &&
+               (*f)[i].transform == transform) {
+                flat_refs[i]++;
+                return(i);
+            }
         }
     }
 
     /* resize array */
     new_f = realloc(f, (h.flats + 1) * sizeof(Flat));
     if(new_f == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     f = new_f;
     new_flat_refs = realloc(flat_refs, (h.flats + 1) * sizeof(int));
     if(new_flat_refs == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     flat_refs = new_flat_refs;
-    (*f)[i].texture = texture;
-    (*f)[i].shade = shade;
-    (*f)[i].bias = bias;
-    (*f)[i].transform = transform;
+    (*f)[h.flats].texture = texture;
+    (*f)[h.flats].shade = shade;
+    (*f)[h.flats].bias = bias;
+    (*f)[h.flats].transform = transform;
     flat_refs[h.flats] = 1;
     h.flats++;
     return(h.flats-1);
@@ -2250,11 +2180,13 @@ int deref_flat(int findex) {
         /* resize the arrays */
         new_f = realloc(f, (h.flats - 1) * sizeof(Flat));
         if(new_f == NULL) {
+            fprintf(stderr, "realloc() failed\n");
             return(-1);
         }
         f = new_f;
         new_flat_refs = realloc(flat_refs, (h.flats - 1) * sizeof(int));
         if(new_flat_refs == NULL) {
+            fprintf(stderr, "realloc() failed\n");
             return(-1);
         }
         flat_refs = new_flat_refs;
@@ -2292,6 +2224,9 @@ int modify_flat(int findex,
     /* otherwise, try adding a new point with the new value,
      * if it's found, it'll have its refcount increased */
     new_findex = add_flat(texture, shade, bias, transform);
+    if(new_findex < 0) {
+        return(-1);
+    }
     /* dereference the old flat */
     deref_flat(findex);
 
@@ -2306,6 +2241,7 @@ int add_line(int point, int sector,
     /* resize array */
     new_l = realloc(l, (h.lines + 1) * sizeof(Line));
     if(new_l == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     l = new_l;
@@ -2329,17 +2265,18 @@ int expand_lines(int index, int amount) {
     /* resize array */
     new_l = realloc(l, (h.lines + amount) * sizeof(Line));
     if(new_l == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     l = new_l;
 
-    if(index == h.lines) {
+    if(index < h.lines) {
         /* make the space */
         memmove(&(*l)[index + amount], &(*l)[index], sizeof(Line) * (h.lines - index));
         /* repoint sectors with firstline after this index */
         for(i = 0; i < h.sectors; i++) {
-            if((*s)[i].firstline > index) {
-                (*s)[i].firstline++;
+            if((*s)[i].firstline >= index) {
+                (*s)[i].firstline += amount;
             }
         }
     }
@@ -2360,7 +2297,7 @@ int insert_line(int index,
     if(expand_lines(index, 1) < 0) {
         return(-1);
     }
-
+    /* get pointer here after line array may have moved */
     line = &(*l)[index];
 
     point = add_point(x, y);
@@ -2406,6 +2343,7 @@ int delete_line(int index) {
     /* resize array */
     new_l = realloc(l, (h.lines - 1) * sizeof(Line));
     if(new_l == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     l = new_l;
@@ -2434,6 +2372,8 @@ int split_line(int sindex, int lindex) {
     if(insert_line(lindex + 1, x, y, line->sector, line->wall[CEILING], line->wall[FLOOR]) < 0) {
         return(-1);
     }
+    /* refresh pointer */
+    line = &(*l)[lindex];
     /* update next index and line since it'll have moved from the insertion */
     next_lindex++;
     next_line = &(*l)[next_lindex];
@@ -2456,7 +2396,11 @@ int split_line(int sindex, int lindex) {
         if(insert_line(other_lindex + 1, x, y, sindex, other_line->wall[CEILING], other_line->wall[FLOOR]) < 0) {
             return(-1);
         }
+
+        other_sector->lines++;
     }
+
+    sector->lines++;
 
     return(0);
 }
@@ -2469,6 +2413,7 @@ int find_opposite_line(int sindex, int lindex) {
 
     /* if no opposite sector, there won't be an opposite line */
     if(line->sector == NO_SECTOR) {
+        fprintf(stderr, "No opposite sector to find opposite line on.\n");
         return(-1);
     }
 
@@ -2478,96 +2423,94 @@ int find_opposite_line(int sindex, int lindex) {
 
     /* find the line with the point in the other sector */
     sector = &(*s)[line->sector];
-    for(i = 0; i < sector->lines; i++) {
-        if((*l)[sector->firstline + i].point == point) {
+    for(i = sector->firstline; i < sector->firstline + sector->lines; i++) {
+        if((*l)[i].point == point) {
             return(i);
         }
     }
 
+    fprintf(stderr, "Opposite sector doesn't share common points!  This is a bug.\n");
     return(-1);
 }
 
-void unlink_line(int sindex, int lindex) {
+int unlink_sectors(int sindex, int lindex) {
     int other_lindex;
 
     other_lindex = find_opposite_line(sindex, lindex);
-    if(other_lindex >= 0) {
-        (*l)[other_lindex].sector = NO_SECTOR;
+    if(other_lindex < 0) {
+        return(-1);
     }
 
+    (*l)[lindex].sector = NO_SECTOR;
     (*l)[other_lindex].sector = NO_SECTOR;
+
+    return(0);
 }
 
 int find_line(int sindex, int pindex) {
     Sector *sector = &(*s)[sindex];
     int i;
 
-    for(i = 0; i < sector->lines; i++) {
-        if((*l)[sector->firstline + i].point == pindex) {
-            return(sector->firstline + i);
+    for(i = sector->firstline; i < sector->firstline + sector->lines; i++) {
+        if((*l)[i].point == pindex) {
+            return(i);
         }
     }
 
+    fprintf(stderr, "Couldn't find line in sector by point.\n");
     return(-1);
 }
 
 int join_lines(int sindex, int pindex) {
-    /* delete a point from a line and connecting the 2 points together, decreasing the point refcount and freeing it if needed */
+    /* delete a point from a line and connecting the 2 points together */
     int lindex, prev_lindex;
 
     lindex = find_line(sindex, pindex);
 
     Sector *sector = &(*s)[sindex];
 
+    if(sector->lines <= 3) {
+        /* don't let a sector have less than 3 points */
+        fprintf(stderr, "Sector would have less than 3 points.\n");
+        return(-1);
+    }
+
     /* find the other line this would be joined with */
     prev_lindex = get_prev_lindex(sector, lindex);
 
     /* unlink lines */
-    unlink_line(sindex, lindex);
-    unlink_line(sindex, prev_lindex);
+    unlink_sectors(sindex, lindex);
+    unlink_sectors(sindex, prev_lindex);
 
     /* delete the line with this point */
     if(delete_line(lindex) < 0) {
         return(-1);
     }
 
-    return(0);
+    sector->lines--;
+
+    return(prev_lindex);
 }
 
-int split_point(int sindex, int pindex,
-                float x, float y) {
-    /* create a new point for a line sharing a point with another line to freely move it away */
-    int lindex, prev_lindex;
-    int new_point;
-
-    lindex = find_line(sindex, pindex);
-
-    Sector *sector = &(*s)[sindex];
-
-    /* find the other line this would be joined with */
-    prev_lindex = get_prev_lindex(sector, lindex);
-
-    /* unlink lines */
-    unlink_line(sindex, lindex);
-    unlink_line(sindex, prev_lindex);
-
-    new_point = modify_point((*l)[lindex].point, x, y);
-    if(new_point < 0) {
+int set_point(int sindex, int pindex,
+              float x, float y) {
+    int lindex = find_line(sindex, pindex);
+    if(lindex < 0) {
         return(-1);
     }
-    (*l)[lindex].point = new_point;
 
-    return(0);
-}
-
-int set_line_point(int lindex,
-                   float x, float y) {
     int new_point = modify_point((*l)[lindex].point, x, y);
     if(new_point < 0) {
         return(-1);
     }
     (*l)[lindex].point = new_point;
     return(0);
+}
+
+void move_point(int pindex,
+                float x, float y) {
+    (*p)[pindex].x = x;
+    (*p)[pindex].y = y;
 }
 
 int set_line_wall(int lindex, int which,
@@ -2588,7 +2531,7 @@ int set_line_texture(int lindex, int which,
                      unsigned char texture) {
     Wall *wall = &(*w)[(*l)[lindex].wall[which]];
     if(set_line_wall(lindex, which,
-                      texture, wall->shade, wall->bias, wall->transform)) {
+                     texture, wall->shade, wall->bias, wall->transform)) {
         return(-1);
     }
     return(0);
@@ -2640,18 +2583,26 @@ void repoint_lines(int sindex, int lindex1, int lindex2, int new_sindex) {
     int other_lindex;
     int i;
 
+    fprintf(stderr, "Following errors about sector lines aren't errors.\n");
     for(i = lindex1; i < lindex2; i++) {
         other_lindex = find_opposite_line(sindex, i);
         if(other_lindex >= 0) {
             (*l)[other_lindex].sector = new_sindex;
         }
     }
+    fprintf(stderr, "Following errors about sector lines may be errors.\n");
 }
 
 int delete_sector(int sindex) {
     Sector *sector = &(*s)[sindex];
     Sector (*new_s)[];
     int i;
+
+    if(sindex == v.start) {
+        /* don't delete the view sector because this will just crash */
+        fprintf(stderr, "Tried to delete view sector.\n");
+        return(-1);
+    }
 
     if(deref_flat(sector->flat[CEILING]) < 0) {
         return(-1);
@@ -2665,7 +2616,7 @@ int delete_sector(int sindex) {
         memmove(&(*s)[sindex], &(*s)[sindex + 1], sizeof(Sector) * (h.sectors - (sindex + 1)));
         /* repoint lines with sector after this index */
         for(i = 0; i < h.lines; i++) {
-            if((*l)[i].sector > sindex) {
+            if((*l)[i].sector != NO_SECTOR && (*l)[i].sector > sindex) {
                 (*l)[i].sector--;
             }
         }
@@ -2674,6 +2625,7 @@ int delete_sector(int sindex) {
     /* resize array */
     new_s = realloc(s, (h.sectors - 1) * sizeof(Sector));
     if(new_s == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     s = new_s;
@@ -2692,6 +2644,7 @@ int add_sector(unsigned short firstline, unsigned char lines,
 
     new_s = realloc(s, (h.sectors + 1) * sizeof(Sector));
     if(new_s == NULL) {
+        fprintf(stderr, "realloc() failed\n");
         return(-1);
     }
     s = new_s;
@@ -2723,6 +2676,10 @@ int split_sector(int sindex, int pindex1, int pindex2) {
 
     lindex1 = find_line(sindex, pindex1);
     lindex2 = find_line(sindex, pindex2);
+    if(lindex1 < 0 || lindex2 < 0) {
+        fprintf(stderr, "Make sure the correct sector is selected with TAB and that both points are at the edge of that sector.\n");
+        return(-1);
+    }
     /* make sure 2 is after 1 */
     if(lindex2 < lindex1) {
         temp = lindex2;
@@ -2734,45 +2691,59 @@ int split_sector(int sindex, int pindex1, int pindex2) {
         pindex1 = temp;
     }
     /* if either sector would be left with less than 3 lines, don't do anything */
-    if(lindex2 - lindex1 < 3 ||
-       (lindex1 - sector->firstline) + (sector->firstline + sector->lines - lindex2) < 3) {
+    /* 2 is used because the connecting line will be 3 */
+    if(lindex2 - lindex1 < 2 ||
+       (lindex1 - sector->firstline) + (sector->firstline + sector->lines - lindex2) < 2) {
+        fprintf(stderr, "Sector split would leave 1 side with less than 3 lines.\n");
         return(-1);
     }
 
     /* rearrange the line array to make space for the 2 new lines for both sides for both sectors */
+
+    /* make room for the new sector */
+    new_s = realloc(s, (h.sectors + 1) * sizeof(Sector));
+    if(new_s == NULL) {
+        fprintf(stderr, "realloc() failed\n");
+        return(-1);
+    }
+    s = new_s;
+    h.sectors++;
+
+    /* refresh sector pointer */
+    sector = &(*s)[sindex];
+
+    /* repoint opposite lines in what will be the new sector to what will be the new sector */
+    repoint_lines(sindex, lindex1, lindex2, h.sectors - 1);
 
     /* make space, this only affects everything after, so indexes should be fine */
     if(expand_lines(sector->firstline + sector->lines, 2) < 0) {
         return(-1);
     }
 
-    /* make room for the new sector */
-    new_s = realloc(s, (h.sectors + 1) * sizeof(Sector));
-    if(new_s == NULL) {
-        return(-1);
-    }
-    s = new_s;
-    h.sectors++;
-
-    /* repoint opposite lines in what will be the new sector to what will be the new sector */
-    repoint_lines(sindex, lindex1, lindex2, h.sectors - 1);
-
     /* rearrange the lines to be contiguous in each sector */
     /* this inefficiently copies some data just to copy it back but it's never going to be much data and it's clearer */
     Line lines[sector->lines];
-    memcpy(lines, &(*l)[sector->firstline], sector->lines);
+    memcpy(lines,
+           &(*l)[sector->firstline],
+           sector->lines * sizeof(Line));
 
     /* the lines before and after the points will make up the original sector
      * and the lines in the middle will make up the new sector + 1 new line for each */
     /* copy first part before the slice */
-    memcpy(&(*l)[sector->firstline], lines, lindex1 - sector->firstline);
+    memcpy(&(*l)[sector->firstline],
+           lines,
+           (lindex1 - sector->firstline) * sizeof(Line));
     /* copy the end past the second slice in to the first sector, leaving space for the new line */
-    memcpy(&(*l)[lindex1 + 1], &lines[lindex2 - sector->firstline], sector->firstline + sector->lines - lindex2);
+    memcpy(&(*l)[lindex1 + 1],
+           &lines[lindex2 - sector->firstline],
+           (sector->firstline + sector->lines - lindex2) * sizeof(Line));
     /* copy the rest to make up the new sector leaving space at the start for its new line */
-    memcpy(&(*l)[lindex2 + 2], &lines[lindex1 - sector->firstline], lindex2 - lindex1);
+    memcpy(&(*l)[lindex1 + 1 + (sector->firstline + sector->lines - lindex2) + 1],
+           &lines[lindex1 - sector->firstline],
+           (lindex2 - lindex1) * sizeof(Line));
 
     /* update line count */
-    sector->lines = (lindex1 - sector->firstline) + (sector->firstline + sector->lines - lindex2) + 1;
+    sector->lines = (lindex1 - sector->firstline) + 1 + (sector->firstline + sector->lines - lindex2);
 
     new_sector = &(*s)[h.sectors - 1];
     /* make the new sector from the old sector parameters */
@@ -2791,6 +2762,7 @@ int split_sector(int sindex, int pindex1, int pindex2) {
     next_lindex = get_next_lindex(sector, lindex1);
     line = &(*l)[next_lindex];
     new_line->point = pindex1; /* original line's point */
+    point_refs[new_line->point]++;
     new_line->sector = h.sectors - 1; /* the new sector */
     new_line->wall[CEILING] = line->wall[CEILING];
     wall_refs[new_line->wall[CEILING]]++;
@@ -2803,6 +2775,7 @@ int split_sector(int sindex, int pindex1, int pindex2) {
     next_lindex = new_sector->firstline + 1; /* pick a neighboring line */
     line = &(*l)[next_lindex];
     new_line->point = pindex2; /* other side where the sector was pinched off/opposite line's other point */
+    point_refs[new_line->point]++;
     new_line->sector = sindex; /* the original sector */
     new_line->wall[CEILING] = line->wall[CEILING];
     wall_refs[new_line->wall[CEILING]]++;
@@ -2812,9 +2785,62 @@ int split_sector(int sindex, int pindex1, int pindex2) {
     return(0);
 }
 
+int find_line_sector(int lindex) {
+    int i;
+    Sector *sector;
+
+    for(i = 0; i < h.sectors; i++) {
+        sector = &(*s)[i];
+        if(lindex >= sector->firstline && lindex < sector->firstline + sector->lines) {
+            return(i);
+        }
+    }
+
+    fprintf(stderr, "Couldn't find sector for line!  This is a bug.\n");
+    return(-1);
+}
+
 int link_sectors(int sindex, int lindex) {
-    /* link 2 sectors sharing a common line with the same 2 points */
+    /* find point which would be on opposite side then scan through candidates who's other point is the point for this line */
     Sector *sector = &(*s)[sindex];
+    int point, other_point;
+    int other_sindex;
+    int other_lindex = -1;
+    int i;
+
+    point = (*l)[lindex].point;
+    other_point = (*l)[get_next_lindex(sector, lindex)].point;
+
+    for(i = 0; i < h.lines; i++) {
+        /* if the line point is the next line's point */
+        if((*l)[i].point == other_point) {
+            other_sindex = find_line_sector(i);
+            if(other_sindex < 0) {
+                /* shouldn't happen */
+                return(-1);
+            }
+            /* if the next line of the other line is this line's point */
+            if(point == (*l)[get_next_lindex(&(*s)[other_sindex], i)].point) {
+                other_lindex = i;
+                break;
+            }
+        }
+    }
+    if(other_lindex < 0) {
+        fprintf(stderr, "Couldn't find the other line which shares points with this line.\n");
+        return(-1);
+    }
+
+    (*l)[lindex].sector = other_sindex;
+    (*l)[other_lindex].sector = sindex;
+
+    return(0);
+}
+
+int join_sectors(int sindex, int lindex) {
+    /* join 2 sectors sharing a common line with the same 2 points */
+    Sector *sector = &(*s)[sindex];
+    Sector *other_sector;
     Sector *original_sector = sector; /* for copying parameters */
     Line *line = &(*l)[lindex];
     Line *other_line;
@@ -2824,9 +2850,14 @@ int link_sectors(int sindex, int lindex) {
 
     if(other_sindex == NO_SECTOR) {
         /* no other sector */
+        fprintf(stderr, "No other sector to join.\n");
         return(-1);
     }
     other_lindex = find_opposite_line(sindex, lindex);
+    if(other_lindex < 0) {
+        return(-1);
+    }
+
     /* make other_lindex after lindex to simplify memory management */
     if(other_lindex < lindex) {
         temp = other_lindex;
@@ -2840,7 +2871,7 @@ int link_sectors(int sindex, int lindex) {
         line = &(*l)[lindex];
         sector = &(*s)[sindex];
     }
-    Sector *other_sector = &(*s)[other_sindex];
+    other_sector = &(*s)[other_sindex];
     other_line = &(*l)[other_lindex];
 
     /* insert the slice of 1 sector to another sector, except for the 2 lines between them and make that all 1 sector */
@@ -2855,10 +2886,10 @@ int link_sectors(int sindex, int lindex) {
     Line lines[other_sector->lines - 1];
     memcpy(lines,
            &(*l)[other_sector->firstline],
-           other_lindex - other_sector->firstline);
+           (other_lindex - other_sector->firstline) * sizeof(Line));
     memcpy(&lines[other_lindex - other_sector->firstline],
            &(*l)[other_lindex + 1],
-           other_sector->firstline + other_sector->lines - other_lindex - 1);
+           (other_sector->firstline + other_sector->lines - other_lindex - 1) * sizeof(Line));
 
     /* expand space after first sector split line for new lines */
     /* -2 because there's already 1 space to take up where the old line is */
@@ -2867,8 +2898,8 @@ int link_sectors(int sindex, int lindex) {
     }
 
     /* copy other sector lines in and update sector line count */
-    memcpy(&(*l)[lindex], lines, other_sector->lines - 1);
-    sector->lines += other_sector->lines - 1;
+    memcpy(&(*l)[lindex], lines, (other_sector->lines - 1) * sizeof(Line));
+    sector->lines += other_sector->lines - 2;
 
     /* point other sectors pointing to the other sector to the first sector */
     repoint_lines(sindex, lindex, lindex + other_sector->lines - 1, sindex);
@@ -2879,6 +2910,12 @@ int link_sectors(int sindex, int lindex) {
     sector->flat[CEILING] = original_sector->flat[CEILING];
     sector->flat[FLOOR] = original_sector->flat[FLOOR];
     sector->action = original_sector->action;
+
+    /* update the view start index if it was in the sector to be deleted */
+    if(v.start == other_sindex) {
+        v.start = sindex;
+    }
+
     if(delete_sector(other_sindex) < 0) {
         return(-1);
     }
@@ -3079,6 +3116,7 @@ int init_map() {
 
     return(0);
 }
+
 
 int save_file() {
     return(0);
