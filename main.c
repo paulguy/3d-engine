@@ -48,6 +48,8 @@
 #include "log.h"
 #include "cache.h"
 
+extern unsigned char mapnum;
+
 /* screen size of the watch minus the bar showing time */
 #define SCREEN_WIDTH (200)
 #define SCREEN_HEIGHT (202)
@@ -544,6 +546,13 @@ void set_sector_transform_cb(float xx, float xy,
     }
 }
 
+void prompt_mapnum_cb(char *str) {
+    char *endptr;
+
+    mapnum = strtol(str, &endptr, 10);
+    fprintf(stderr, "Mapnum set to %hhu.\n", mapnum);
+}
+
 void print_view() {
     fprintf(stderr, "View is at %f, %f looking at %f ", v.pos.x, v.pos.y, v.angle);
     if(v.angle > (M_PI / 16.0) && v.angle <= (M_PI / 16.0 * 3.0)) {
@@ -1004,10 +1013,12 @@ int main(int argc, char **argv) {
                                 /* texture */
                                 action_which = cursor.y < surface->h / 2 ? CEILING : FLOOR;
                                 if(target == SEL_LINE) {
-                                    fprintf(stderr, "Set line texture: Texture is %hhu.\n", (*w)[(*l)[s_line].wall[action_which]].texture);
+                                    fprintf(stderr, "Set line texture: Texture is %hhu.\nTexture: ",
+                                            (*w)[(*l)[s_line].wall[action_which]].texture);
                                     start_prompt(prompt_line_texture_cb);
                                 } else if(target == SEL_SECTOR) {
-                                    fprintf(stderr, "Set sector texture: Texture is %hhu.\n", (*f)[(*s)[s_sector].flat[action_which]].texture);
+                                    fprintf(stderr, "Set sector texture: Texture is %hhu.\nTexture: ",
+                                            (*f)[(*s)[s_sector].flat[action_which]].texture);
                                     start_prompt(prompt_sector_texture_cb);
                                 }
                                 break;
@@ -1017,12 +1028,12 @@ int main(int argc, char **argv) {
                                 if(target == SEL_LINE) {
                                     fprintf(stderr, "Set line shade: Shade is ");
                                     print_shade((*w)[(*l)[s_line].wall[action_which]].shade);
-                                    fprintf(stderr, ".\n");
+                                    fprintf(stderr, ".\n Shade:");
                                     start_prompt(prompt_line_shade_cb);
                                 } else if(target == SEL_SECTOR) {
                                     fprintf(stderr, "Set sector shade: Shade is ");
                                     print_shade((*f)[(*s)[s_sector].flat[action_which]].shade);
-                                    fprintf(stderr, ".\n");
+                                    fprintf(stderr, ".\n Shade:");
                                     start_prompt(prompt_sector_shade_cb);
                                 }
                                 break;
@@ -1058,6 +1069,14 @@ int main(int argc, char **argv) {
                                                     matrix2x2->yx, matrix2x2->yy);
                                     print_view();
                                     prompt_matrix2x2(set_sector_transform_cb);
+                                }
+                                break;
+                            case SDLK_N:
+                                start_prompt(prompt_mapnum_cb);
+                                break;
+                            case SDLK_W:
+                                if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
+                                    save_file();
                                 }
                                 break;
                             case SDLK_TAB:

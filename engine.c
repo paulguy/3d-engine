@@ -2755,6 +2755,7 @@ int split_sector(int sindex, int pindex1, int pindex2) {
     flat_refs[new_sector->flat[CEILING]]++;
     new_sector->flat[FLOOR] = sector->flat[FLOOR];
     flat_refs[new_sector->flat[FLOOR]]++;
+    new_sector->action = 0;
 
     /* make the new lines from a neighboring line's parameters */
     /* original sector's new line */
@@ -3117,9 +3118,185 @@ int init_map() {
     return(0);
 }
 
+void save_file() {
+    Data d;
+    int i, j, k;
+    FILE *out;
+    Link_data (*li)[] = NULL;
+    Link_data (*new_li)[];
+    Link_data *link;
+    Sector *sector;
+    Line *line;
+    int found;
+    int other_lindex;
+    int viewpoint = -1;
 
-int save_file() {
-    return(0);
+    char name[16];
+    snprintf(name, sizeof(name), "map%hhd.bin", mapnum);
+
+    out = fopen(name, "wb");
+    if(out == NULL) {
+        fprintf(stderr, "Opening %s for writing failed.\n", name);
+        return;
+    }
+
+    /* make the link structure from the sector/line list */
+    h.links = 0;
+    for(i = 0; i < h.sectors; i++) {
+        sector = &(*s)[i];
+        for(j = 0; j < sector->lines; j++) {
+            line = &(*l)[sector->firstline + j];
+            if(line->sector != NO_SECTOR) {
+                /* see if the link going the other way was already made */
+                found = 0;
+                for(k = 0; k < h.links; k++) {
+                    if(i == (*li)[k].lsector && j == (*li)[k].lline) {
+                        found = 1;
+                        break;
+                    }
+                }
+
+                /* if not, record the new link */
+                if(!found) {
+                    other_lindex = find_opposite_line(i, j);
+                    if(other_lindex < 0) {
+                        fprintf(stderr, "WARNING: Other lindex couldn't be found on a linked line.  This is a bug!  Continuing anyway...\n");
+                        continue;
+                    }
+
+                    new_li = realloc(li, (h.links + 1) * sizeof(Link_data));
+                    if(new_li == NULL) {
+                        fprintf(stderr, "realloc() failed\n");
+                        goto error;
+                    }
+                    li = new_li;
+                    h.links++;
+
+                    link = &(*li)[h.links - 1];
+                    link->sector = i;
+                    link->line = j;
+                    link->lsector = line->sector;
+                    link->lline = other_lindex - (*s)[line->sector].firstline;
+                }
+            }
+        }
+    }
+    /* TODO: add/list/remove views */
+    h.views = 1;
+
+    /* view points are referenced from the point list */
+    viewpoint = add_point(v.pos.x, v.pos.y);
+
+    if(fwrite(&h, 1, sizeof(Header), out) < sizeof(Header)) {
+        fprintf(stderr, "Writing header failed.\n");
+        goto error;
+    }
+
+    for(i = 0; i < h.points; i++) {
+        d.p.x = (*p)[i].x;
+        d.p.y = (*p)[i].y;
+        if(fwrite(&d.p, 1, sizeof(d.p), out) < sizeof(d.p)) {
+            fprintf(stderr, "Writing point failed.\n");
+            goto error;
+        }
+    }
+
+    for(i = 0; i < h.matrix2x2s; i++) {
+        d.m22.xx = (*m22)[i].xx;
+        d.m22.xy = (*m22)[i].xy;
+        d.m22.yx = (*m22)[i].yx;
+        d.m22.yy = (*m22)[i].yy;
+        if(fwrite(&d.m22, 1, sizeof(d.m22), out) < sizeof(d.m22)) {
+            fprintf(stderr, "Writing matrix2x2 failed.\n");
+            goto error;
+        }
+    }
+
+    for(i = 0; i < h.matrix3x2s; i++) {
+        d.m32.xx = (*m32)[i].xx;
+        d.m32.xy = (*m32)[i].xy;
+        d.m32.xz = (*m32)[i].xz;
+        d.m32.yx = (*m32)[i].yx;
+        d.m32.yy = (*m32)[i].yy;
+        d.m32.yz = (*m32)[i].yz;
+        if(fwrite(&d.m32, 1, sizeof(d.m32), out) < sizeof(d.m32)) {
+            fprintf(stderr, "Writing matrix3x2 failed.\n");
+            goto error;
+        }
+    }
+
+    for(i = 0; i < h.walls; i++) {
+        d.w.texture = (*w)[i].texture;
+        d.w.shade = (*w)[i].shade;
+        d.w.bias = (*w)[i].bias;
+        d.w.transform = (*w)[i].transform;
+        if(fwrite(&d.w, 1, sizeof(d.w), out) < sizeof(d.w)) {
+            fprintf(stderr, "Writing wall failed.\n");
+            goto error;
+        }
+    }
+
+    for(i = 0; i < h.lines; i++) {
+        d.l.point = (*l)[i].point;
+        d.l.wall[CEILING] = (*l)[i].wall[CEILING];
+        d.l.wall[FLOOR] = (*l)[i].wall[FLOOR];
+        if(fwrite(&d.l, 1, sizeof(d.l), out) < sizeof(d.l)) {
+            fprintf(stderr, "Writing line failed.\n");
+            goto error;
+        }
+    }
+
+    for(i = 0; i < h.flats; i++) {
+        d.f.texture = (*f)[i].texture;
+        d.f.shade = (*f)[i].shade;
+        d.f.bias = (*f)[i].bias;
+        d.f.transform = (*f)[i].transform;
+        if(fwrite(&d.f, 1, sizeof(d.f), out) < sizeof(d.f)) {
+            fprintf(stderr, "Writing flat failed.\n");
+            goto error;
+        }
+    }
+
+    for(i = 0; i < h.sectors; i++) {
+        d.s.height[CEILING] = (*s)[i].height[CEILING];
+        d.s.height[FLOOR] = (*s)[i].height[FLOOR];
+        d.s.flat[CEILING] = (*s)[i].flat[CEILING];
+        d.s.flat[FLOOR] = (*s)[i].flat[FLOOR];
+        d.s.firstline = (*s)[i].firstline;
+        d.s.lines = (*s)[i].lines - 3; /* 3 lines minimum so 0 is 3 mines */
+        d.s.action = (*s)[i].action;
+        if(fwrite(&d.s, 1, sizeof(d.s), out) < sizeof(d.s)) {
+            fprintf(stderr, "Writing sector failed.\n");
+            goto error;
+        }
+    }
+
+    if(fwrite(li, 1, sizeof(Link_data) * h.links, out) < sizeof(Link_data) * h.links) {
+        fprintf(stderr, "Writing links failed.\n");
+        goto error;
+    }
+
+    d.v.start = v.start;
+    d.v.pos = viewpoint;
+    d.v.angle = v.angle;
+    d.v.startheight = v.startheight;
+    d.v.fov = v.fov;
+    if(fwrite(&d.v, 1, sizeof(d.v), out) < sizeof(d.v)) {
+        fprintf(stderr, "Writing view failed.\n");
+        goto error;
+    }
+
+    fprintf(stderr, "File %s saved.\n", name);
+
+error:
+    if(viewpoint >= 0) {
+        deref_point(viewpoint);
+    }
+
+    if(li != NULL) {
+        free(li);
+    }
+    fclose(out);
 }
 #endif
 

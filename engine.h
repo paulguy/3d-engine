@@ -171,6 +171,7 @@ int set_sector_bias(int sindex, int which,
 int set_sector_transform(int sindex, int which,
                          float xx, float xy,
                          float yx, float yy);
+void save_file();
 #endif
  
 float sin_lookup_wrapper(float angle);
