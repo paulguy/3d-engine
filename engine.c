@@ -1651,6 +1651,132 @@ int get_point(unsigned int x, unsigned int y,
     return(pindex2);
 }
 
+int point_in_sector(Sector *sector, float x, float y) {
+    Point *p1, *p2;
+    float slope;
+    float intercept;
+    int i;
+    /* iterate through sector lines and find if they encircle the given point */
+
+    /* sector lines are all clockwise, so the view will be on a determinable side of each line */
+    p1 = &(*p)[(*l)[sector->firstline].point];
+    for(i = 0; i < sector->lines; i++) {
+        p2 = &(*p)[(*l)[i + 1 == sector->lines ? sector->firstline : sector->firstline + i + 1].point];
+
+        if(p1->x == p2->x) {
+            /* line is straight up and down */
+            if(p2->y > p1->y) {
+                /* inside of sector is facing right */
+                if(x < p1->x) {
+                    /* view is to the left */
+                    return(0);
+                }
+            } else {
+                /* inside of sector is facing left */
+                if(x > p1->x) {
+                    /* view is to the right */
+                    return(0);
+                }
+            }
+        } else if(p1->y == p2->y) {
+            /* line is straight left to right */
+            if(p2->x > p1->x) {
+                /* inside of sector is facing down */
+                if(y > p1->y) {
+                    /* view is above */
+                    return(0);
+                }
+            } else {
+                /* inside of sector is facing up */
+                if(y < p1->y) {
+                    /* view is below */
+                    return(0);
+                }
+            }
+        } else {
+            /* get slope and find intercept then determine which side it should be on and which it is on */
+            if(fabs(p2->x - p1->x) < fabs(p2->y - p1->y)) {
+                /* vertical */
+                slope = (p2->x - p1->x) / (p2->y - p1->y);
+
+                if(p2->y > p1->y) {
+                    /* inside of sector is facing right */
+                    intercept = p1->x + ((y - p1->y) * slope);
+                    if(x <= intercept) {
+                        /* view is to the left */
+                        return(0);
+                    }
+                } else {
+                    /* inside of sector is facing left */
+                    intercept = p2->x + ((x - p2->y) * slope);
+                    if(x >= intercept) {
+                        /* view is to the right */
+                        return(0);
+                    }
+                }
+            } else {
+                /* horizontal */
+                slope = (p2->y - p1->y) / (p2->x - p1->x);
+
+                if(p2->x > p1->x) {
+                    /* inside of sector is facing down */
+                    intercept = p1->y + ((x - p1->x) * slope);
+                    if(y >= intercept) {
+                        /* view is above */
+                        return(0);
+                    }
+                } else {
+                    /* inside of sector is facing up */
+                    intercept = p2->y + ((x - p2->x) * slope);
+                    if(y <= intercept) {
+                        /* view is below */
+                        return(0);
+                    }
+                }
+            }
+        }
+
+        p1 = p2;
+    }
+
+    return(1);
+}
+
+int find_sector_point(float x, float y) {
+    int i;
+
+    for(i = 0; i < h.sectors; i++) {
+        if(point_in_sector(&(*s)[i], x, y) != 0) {
+            return(i);
+        }
+    }
+
+    return(-1);
+}
+
+void place_view_somewhere_sensible() {
+    int sindex, lindex;
+    Sector *sector;
+    Point *point;
+
+    sindex = find_sector_point(v.pos.x, v.pos.y);
+    if(sindex < 0) {
+        v.pos.x = 0.0;
+        v.pos.y = 0.0;
+        v.start = 0;
+        sector = &(*s)[0];
+        for(lindex = sector->firstline; lindex < sector->firstline + sector->lines; lindex++) {
+            point = &(*p)[(*l)[lindex].point];
+            v.pos.x += point->x;
+            v.pos.y += point->y;
+        }
+        v.pos.x /= sector->lines;
+        v.pos.y /= sector->lines;
+    } else {
+        v.start = sindex;
+    }
+}
+
 /* Map structure modification functions */
 
 int add_point(float x, float y) {
@@ -2382,16 +2508,16 @@ int split_line(int sindex, int lindex) {
         /* if there's a sector on the other side, also split the line in the other sector */
         other_sector = &(*s)[line->sector];
         /* find line in other sector */
-        for(other_lindex = 0; other_lindex < other_sector->lines; other_lindex++) {
-            other_next_lindex = get_next_lindex(other_sector, other_lindex);;
+        for(other_lindex = other_sector->firstline;
+            other_lindex < other_sector->firstline + other_sector->lines;
+            other_lindex++) {
+            other_next_lindex = get_next_lindex(other_sector, other_lindex);
             /* points will be in opposite order */
-            if((*l)[other_sector->firstline + other_lindex].point == next_line->point &&
-               (*l)[other_sector->firstline + other_next_lindex].point == line->point) {
+            if((*l)[other_next_lindex].point == line->point) {
                 break;
             }
         }
         /* get absolute line index and insert a new line, point it back to original sector */
-        other_lindex += other_sector->firstline;
         other_line = &(*l)[other_lindex];
         if(insert_line(other_lindex + 1, x, y, sindex, other_line->wall[CEILING], other_line->wall[FLOOR]) < 0) {
             return(-1);
@@ -2463,11 +2589,13 @@ int find_line(int sindex, int pindex) {
 
 int join_lines(int sindex, int pindex) {
     /* delete a point from a line and connecting the 2 points together */
-    int lindex, prev_lindex;
+    int lindex, prev_lindex, other_lindex;
+    Line *line;
 
     lindex = find_line(sindex, pindex);
 
     Sector *sector = &(*s)[sindex];
+    Sector *other_sector;
 
     if(sector->lines <= 3) {
         /* don't let a sector have less than 3 points */
@@ -2478,15 +2606,28 @@ int join_lines(int sindex, int pindex) {
     /* find the other line this would be joined with */
     prev_lindex = get_prev_lindex(sector, lindex);
 
-    /* unlink lines */
-    unlink_sectors(sindex, lindex);
-    unlink_sectors(sindex, prev_lindex);
+    /* if this line has a sector on the other side, delete the line that shares the point */
+    line = &(*l)[lindex];
+    if(line->sector != NO_SECTOR) {
+        /* get this pointer first in case the line pointer moves */
+        other_sector = &(*s)[line->sector];
+        other_lindex = find_line(line->sector, pindex);
+        if(delete_line(other_lindex) < 0) {
+            return(-1);
+        }
+        other_sector->lines--;
+
+        /* update indexes if it will have moved from the line deletion */
+        if(lindex > other_lindex) {
+            lindex--;
+            prev_lindex--;
+        }
+    }
 
     /* delete the line with this point */
     if(delete_line(lindex) < 0) {
         return(-1);
     }
-
     sector->lines--;
 
     return(prev_lindex);
@@ -2504,6 +2645,9 @@ int set_point(int sindex, int pindex,
         return(-1);
     }
     (*l)[lindex].point = new_point;
+
+    place_view_somewhere_sensible();
+
     return(0);
 }
 
@@ -2782,6 +2926,8 @@ int split_sector(int sindex, int pindex1, int pindex2) {
     wall_refs[new_line->wall[CEILING]]++;
     new_line->wall[FLOOR] = line->wall[FLOOR];
     wall_refs[new_line->wall[FLOOR]]++;
+
+    place_view_somewhere_sensible();
 
     return(0);
 }
@@ -3158,7 +3304,7 @@ void save_file() {
 
                 /* if not, record the new link */
                 if(!found) {
-                    other_lindex = find_opposite_line(i, j);
+                    other_lindex = find_opposite_line(i, sector->firstline + j);
                     if(other_lindex < 0) {
                         fprintf(stderr, "WARNING: Other lindex couldn't be found on a linked line.  This is a bug!  Continuing anyway...\n");
                         continue;

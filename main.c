@@ -873,11 +873,23 @@ int main(int argc, char **argv) {
                             break;
                         case SDLK_I:
                             if(target == SEL_POINT) {
-                                print_point(h_point);
+                                if(h_point < 0) {
+                                    fprintf(stderr, "Invalid point!\n");
+                                } else {
+                                    print_point(h_point);
+                                }
                             } else if(target == SEL_LINE) {
-                                print_line(h_line);
+                                if(h_line < 0) {
+                                    fprintf(stderr, "Invalid line!\n");
+                                } else {
+                                    print_line(h_line);
+                                }
                             } else if(target == SEL_SECTOR) {
-                                print_sector(h_sector);
+                                if(h_sector < 0) {
+                                    fprintf(stderr, "Invalid sector!\n");
+                                } else {
+                                    print_sector(h_sector);
+                                }
                             }
                             break;
                     }
