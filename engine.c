@@ -210,7 +210,7 @@ static
 void print_data(Header *h) {
     int i;
 
-    LOG("%hu %hu %hu %hu %hu %hu %hu\n", h->points, h->matrix2x2s, h->matrix3x2s, h->lines, h->sectors, h->links, h->views);
+    LOG("%hu %hu %hu %hu %hu %hu %hu %hu %hu\n", h->points, h->matrix2x2s, h->matrix3x2s, h->walls, h->lines, h->flats, h->sectors, h->links, h->views);
 
     for(i = 0; i < h->points; i++) {
         LOG("%d Point %f %f\n", i, (*p)[i].x, (*p)[i].y);

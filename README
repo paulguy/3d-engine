@@ -1,0 +1,62 @@
+Editor Keys:
+LEFT/RIGHT - Turn left and right.
+A/D - Strafe left and right.
+W/S - Move forward and back.
+Q - Quit.
+Hold SHIFT - Speed up movement.
+Hold middle mouse button - Forward/back movement and strafing by mouse
+                           movements.
+Hold right mouse button - Turning by mouse movements.
+Click left mouse button - Select point, line and sector.
+
+If an action would affect just a floor or ceiling, which one is determined by
+whether the cursor is on the top or bottom half of the window when the action
+is first initiated, not when completed, in the case of an action which
+requests more input.
+
+If the editor isn't waiting for text entry or selection of another object:
+J - Point mode:
+      Join 2 lines on sides of point together.
+    Line mode:
+      Join 2 sectors on sides of line together.
+X - Point mode:
+      Requires selecting a second point, then splits a sector in to 2 along
+      the line formed between the 2 points.
+    Line mode:
+      Splits a line at the midpoint in to 2 lines.
+L - Line mode:
+      Link 2 lines on 2 sectors which are both sharing the same 2 common
+      points, allowing to see through to each other sector.
+U - Line mode:
+      Unlink sectors from 2 lines, making a wall between the two sectors.
+M - Point mode:
+      Move a point, will affect all lines sharing the point, CTRL+M if this
+      isn't desired.
+CTRL+M - Point mode:
+            Move a point independently of anything else sharing the point.
+CTRL+S - Sector mode:
+           Solidify sector, deletes the sector, making it in to a wall.
+T - In line or sector mode, requires entering in a new texture number, then
+    sets the wall or sector texture to that.
+H - Like T but shade.  Shade is given as 3 numbers from 0-3 for RGB, 'p' as
+    first character to display as parallax.  Negative numbers do subtractive
+    blending instead of additive.
+CTRL+H - Sector mode:
+           Adjust ceiling or floor height.
+B - Like T but for bias (texture offset), requires entering a new 2x2 matrix.
+R - like T but for transform (texture transformed based on world coordinates).
+      Line mode:
+        Requires entering a new 3x2 matrix (world X, Y and height Z in to
+        texture X, Y).
+      Sector mode:
+        Requires entering a new 2x2 matrix (world X, Y in to texture X, Y).
+I - Print information on any highlighted item in the current mode.
+TAB - Change target mode for actions between point, line and sector modes.
+      Also affects which is highlighted for selection and cursor hover.
+      Selection is based on which sector the cursor is over or which sector
+      the wall the cursor is hovered over belongs to, which line the cursor is
+      over or on the nearest ahead on the pixel column the cursor is on, and
+      the point which is on the selected line and is nearest to the cursor.
+
+If the editor is waiting for text entry or selection of another object:
+ESC - Cancel operation and stop waiting for additional parameters.

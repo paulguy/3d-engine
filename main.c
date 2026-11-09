@@ -75,6 +75,11 @@ const char *SELECTION_TARGET[] = {
     "Sector"
 };
 
+const char *FLAT_NAMES[] = {
+    "Ceiling",
+    "Floor"
+};
+
 SDL_Surface *load_png_checked(unsigned char number) {
     char name[16];
     snprintf(name, sizeof(name), "tex%hhd.png", number);
@@ -467,33 +472,43 @@ void prompt_sector_texture_cb(char *str) {
     }
 }
 
-void prompt_line_shade_cb(char *str) {
-    char *endptr;
+int parse_shade(const char *str, int *shade) {
     int color;
-    int shade = 0;
+    *shade = 0;
 
-    char *num = str;
+    char *endptr;
+    const char *num = str;
 
     if(num[0] == '\n') {
-        return;
+        return(-1);
     } else if(num[0] == 'p' || num[0] == 'P') {
-        shade |= SHADE_PARALLAX;
+        *shade |= SHADE_PARALLAX;
         num = &num[1];
     }
 
     if(num[0] == '\n') {
-        return;
+        return(-1);
     } else if(num[0] == '-') {
-        shade |= SHADE_SUB;
+        *shade |= SHADE_SUB;
         num = &num[1];
     }
 
     /* shades are 0-3, so base 4 */
     color = strtol(num, &endptr, 4);
     if(endptr == num) {
+        return(-1);
+    }
+    *shade |= (color & 0x03) | ((color & 0x0C) << 1) | ((color & 0x30) << 2);
+
+    return(0);
+}
+
+void prompt_line_shade_cb(char *str) {
+    int shade;
+
+    if(parse_shade(str, &shade) < 0) {
         return;
     }
-    shade |= (color & 0x03) | ((color & 0x0C) << 1) | ((color & 0x30) << 2);
 
     if(set_line_shade(s_line, action_which,
                       shade) < 0) {
@@ -502,11 +517,9 @@ void prompt_line_shade_cb(char *str) {
 }
 
 void prompt_sector_shade_cb(char *str) {
-    char *endptr;
     int shade;
 
-    shade = strtol(str, &endptr, 10);
-    if(endptr == str) {
+    if(parse_shade(str, &shade) < 0) {
         return;
     }
 
@@ -514,6 +527,18 @@ void prompt_sector_shade_cb(char *str) {
                         shade) < 0) {
         fprintf(stderr, "Set sector shade failed.\n");
     }
+}
+
+void prompt_sector_height_cb(char *str) {
+    char *endptr;
+    float height;
+
+    height = strtof(str, &endptr);
+    if(endptr == str) {
+        return;
+    }
+
+    (*s)[s_sector].height[action_which] = height;
 }
 
 void set_line_bias_cb(float x, float y) {
@@ -988,7 +1013,7 @@ int main(int argc, char **argv) {
                             case SDLK_M:
                                 /* moving */
                                 if(target == SEL_POINT) {
-                                    if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_SHIFT) {
+                                    if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
                                         fprintf(stderr, "Set Point: Point is at %f, %f.\n", (*p)[s_point].x, (*p)[s_point].y);
                                         print_view();
                                         prompt_point(set_point_cb);
@@ -1013,12 +1038,12 @@ int main(int argc, char **argv) {
                                 /* texture */
                                 action_which = cursor.y < surface->h / 2 ? CEILING : FLOOR;
                                 if(target == SEL_LINE) {
-                                    fprintf(stderr, "Set line texture: Texture is %hhu.\nTexture: ",
-                                            (*w)[(*l)[s_line].wall[action_which]].texture);
+                                    fprintf(stderr, "Set %s line texture: Texture is %hhu.\nTexture: ",
+                                            FLAT_NAMES[action_which], (*w)[(*l)[s_line].wall[action_which]].texture);
                                     start_prompt(prompt_line_texture_cb);
                                 } else if(target == SEL_SECTOR) {
-                                    fprintf(stderr, "Set sector texture: Texture is %hhu.\nTexture: ",
-                                            (*f)[(*s)[s_sector].flat[action_which]].texture);
+                                    fprintf(stderr, "Set sector %s texture: Texture is %hhu.\nTexture: ",
+                                            FLAT_NAMES[action_which], (*f)[(*s)[s_sector].flat[action_which]].texture);
                                     start_prompt(prompt_sector_texture_cb);
                                 }
                                 break;
@@ -1026,15 +1051,22 @@ int main(int argc, char **argv) {
                                 /* shade */
                                 action_which = cursor.y < surface->h / 2 ? CEILING : FLOOR;
                                 if(target == SEL_LINE) {
-                                    fprintf(stderr, "Set line shade: Shade is ");
+                                    fprintf(stderr, "Set %s line shade: Shade is ", FLAT_NAMES[action_which]);
                                     print_shade((*w)[(*l)[s_line].wall[action_which]].shade);
-                                    fprintf(stderr, ".\n Shade:");
+                                    fprintf(stderr, ".\nShade: ");
                                     start_prompt(prompt_line_shade_cb);
                                 } else if(target == SEL_SECTOR) {
-                                    fprintf(stderr, "Set sector shade: Shade is ");
-                                    print_shade((*f)[(*s)[s_sector].flat[action_which]].shade);
-                                    fprintf(stderr, ".\n Shade:");
-                                    start_prompt(prompt_sector_shade_cb);
+                                    if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
+                                        fprintf(stderr, "Set sector %s height: Height is %f.\nHeight: ",
+                                                FLAT_NAMES[action_which],
+                                                (*s)[s_sector].height[action_which]);
+                                        start_prompt(prompt_sector_height_cb);
+                                    } else {
+                                        fprintf(stderr, "Set sector %s shade: Shade is ", FLAT_NAMES[action_which]);
+                                        print_shade((*f)[(*s)[s_sector].flat[action_which]].shade);
+                                        fprintf(stderr, ".\nShade: ");
+                                        start_prompt(prompt_sector_shade_cb);
+                                    }
                                 }
                                 break;
                             case SDLK_B:
@@ -1042,12 +1074,14 @@ int main(int argc, char **argv) {
                                 action_which = cursor.y < surface->h / 2 ? CEILING : FLOOR;
                                 if(target == SEL_LINE) {
                                     point = &(*p)[(*w)[(*l)[s_line].wall[action_which]].bias];
-                                    fprintf(stderr, "Set line bias: Bias is %f, %f.\n", point->x, point->y);
+                                    fprintf(stderr, "Set %s line bias: Bias is %f, %f.\n", FLAT_NAMES[action_which],
+                                            point->x, point->y);
                                     print_view();
                                     prompt_point(set_line_bias_cb);
                                 } else if(target == SEL_SECTOR) {
                                     point = &(*p)[(*f)[(*s)[s_sector].flat[action_which]].bias];
-                                    fprintf(stderr, "Set line bias: Bias is %f, %f.\n", point->x, point->y);
+                                    fprintf(stderr, "Set sector %s bias: Bias is %f, %f.\n", FLAT_NAMES[action_which],
+                                            point->x, point->y);
                                     print_view();
                                     prompt_point(set_sector_bias_cb);
                                 }
@@ -1057,14 +1091,16 @@ int main(int argc, char **argv) {
                                 action_which = cursor.y < surface->h / 2 ? CEILING : FLOOR;
                                 if(target == SEL_LINE) {
                                     matrix3x2 = &(*m32)[(*w)[(*l)[s_line].wall[action_which]].transform];
-                                    fprintf(stderr, "Set line transform: Transform is [%f, %f, %f] [%f, %f, %f] .\n",
+                                    fprintf(stderr, "Set %s line transform: Transform is [%f, %f, %f] [%f, %f, %f] .\n",
+                                                    FLAT_NAMES[action_which],
                                                     matrix3x2->xx, matrix3x2->xy, matrix3x2->xz,
                                                     matrix3x2->yx, matrix3x2->yy, matrix3x2->yz);
                                     print_view();
                                     prompt_matrix3x2(set_line_transform_cb);
                                 } else if(target == SEL_SECTOR) {
                                     matrix2x2 = &(*m22)[(*f)[(*s)[s_sector].flat[action_which]].transform];
-                                    fprintf(stderr, "Set sector transform: Transform is [%f, %f] [%f, %f] .\n",
+                                    fprintf(stderr, "Set sector %s transform: Transform is [%f, %f] [%f, %f] .\n",
+                                                    FLAT_NAMES[action_which],
                                                     matrix2x2->xx, matrix2x2->xy,
                                                     matrix2x2->yx, matrix2x2->yy);
                                     print_view();
