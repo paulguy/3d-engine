@@ -191,11 +191,14 @@ Flat (*f)[] = NULL;
 Sector (*s)[] = NULL;
 
 #ifdef EDITOR
+View_data (*vs)[] = NULL;
+
 int *point_refs = NULL;
 int *m22_refs = NULL;
 int *m32_refs = NULL;
 int *wall_refs = NULL;
 int *flat_refs = NULL;
+
 Header h;
 #endif
 
@@ -279,6 +282,14 @@ void apply_view_data(View_data *view) {
 
 int init_map();
 
+void decode_waypoint(unsigned int action,
+                     unsigned short *firstpoint,
+                     unsigned int *count) {
+    *firstpoint = (action & 0xFFFF00) >> 8;
+    /* avoid division by 0 by adding 1 */
+    *count = ((action & 0xFF000000) >> 24) + 1;
+}
+
 int engine_load(unsigned char number, unsigned char view) {
 #ifndef EDITOR
     Header h;
@@ -301,6 +312,7 @@ int engine_load(unsigned char number, unsigned char view) {
         free(m22);
         free(p);
 #ifdef EDITOR
+        free(vs);
         free(point_refs);
         free(m22_refs);
         free(m32_refs);
@@ -474,6 +486,17 @@ int engine_load(unsigned char number, unsigned char view) {
         (*s)[i].lines = d.s.lines;
         (*s)[i].action = d.s.action;
 #ifdef EDITOR
+        unsigned short firstpoint;
+        unsigned int count;
+        unsigned int j;
+
+        if((d.s.action & 0xFF) == ACTION_WAYPOINT) {
+            decode_waypoint(d.s.action, &firstpoint, &count);
+            for(j = firstpoint; j < firstpoint + count; j++) {
+                point_refs[j]++;
+            }
+        }
+
         flat_refs[d.s.flat[CEILING]]++;
         flat_refs[d.s.flat[FLOOR]]++;
 #endif
@@ -489,9 +512,21 @@ int engine_load(unsigned char number, unsigned char view) {
     }
 
     start += sizeof(Link_data) * h.links;
+#ifdef EDITOR
+    vs = malloc(sizeof(View_data) * h.views);
+    if(vs == NULL) {
+        goto error_sectors;
+    }
+    read_map_p(start, sizeof(View_data) * h.views, vs);
+    for(i = 0; i < h.views; i++) {
+        point_refs[(*vs)[i].pos]++;
+    }
+    apply_view_data(&(*vs)[view]);
+#else
     /* read the selected view */
     read_map_p(start + (view * sizeof(View_data)), sizeof(View_data), &d.v);
     apply_view_data(&d.v);
+#endif
 
     close_map_p();
 
@@ -508,6 +543,10 @@ int engine_load(unsigned char number, unsigned char view) {
 
     return(0);
 
+#ifdef EDITOR
+error_sectors:
+    free(s);
+#endif
 error_flats:
     free(f);
 error_lines:
@@ -1274,10 +1313,10 @@ int do_action(Sector *sector) {
             }
             return(1);
         case ACTION_WAYPOINT:
-            unsigned short firstpoint = (sector->action & 0xFFFF00) >> 8;
-            unsigned short count = (sector->action & 0xFF000000) >> 24;
-            /* count is mapped to start at 1, avoids division by 0 */
-            count++;
+            unsigned short firstpoint;
+            unsigned int count;
+            decode_waypoint(sector->action, &firstpoint, &count);
+ 
             /* pick a waypoint by random */
             unsigned short selection = firstpoint + (rand() % count);
             waypoint.x = (*p)[selection].x;
