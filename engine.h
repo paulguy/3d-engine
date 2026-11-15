@@ -31,6 +31,8 @@
 #define ACTION_WARP (0x01)
 #define ACTION_WAYPOINT (0x02)
 
+#define GET_ACTION(X) (X & 0xFF)
+
 typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
     unsigned short points;
     unsigned short matrix2x2s;
@@ -131,6 +133,19 @@ int get_line(unsigned int x, unsigned int y,
              unsigned int w, unsigned int h);
 int get_point(unsigned int x, unsigned int y,
               unsigned int w, unsigned int h);
+
+void decode_waypoint(unsigned int action,
+                     unsigned short *firstpoint,
+                     unsigned int *count);
+void decode_warp(unsigned int action,
+                 unsigned char *map,
+                 unsigned char *view);
+
+int set_action_none(int sindex);
+int set_action_warp(int sindex, unsigned char map, unsigned char view);
+int set_action_waypoint(int sindex, float x, float y);
+int add_waypoint(int sindex, float x, float y);
+int delete_waypoint(int sindex, int index);
 
 /* these shouldn't need to be accessible outside of editor mode */
 extern Header h;

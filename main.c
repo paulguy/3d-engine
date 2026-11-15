@@ -203,8 +203,8 @@ int check_prompt() {
         /* let the callback set a next callback */
         orig_cb = prompt_cb;
         prompt_cb = NULL;
-        orig_cb(str);
         fcntl(0, F_SETFL, fcntl(0, F_GETFL) & ~O_NONBLOCK);
+        orig_cb(str);
     }
 
     return(prompt_cb != NULL);
@@ -425,6 +425,7 @@ void prompt_matrix3x2(matrix3x2_cb_t callback) {
 }
 
 void split_sector_cb(int sindex, int lindex, int pindex) {
+    /* selected sector and point, then just now clicked point */
     if(split_sector(s_sector, s_point, pindex) < 0) {
         fprintf(stderr, "Split sector failed.\n");
     }
@@ -691,6 +692,236 @@ void print_sector(unsigned short sindex) {
     fprintf(stderr, "Floor Matrix2x2 %hu [%f %f] [%f %f]\n", rindex,
             (*m22)[rindex].xx, (*m22)[rindex].xy,
             (*m22)[rindex].yx, (*m22)[rindex].yy);
+}
+
+void print_action(unsigned int action) {
+    unsigned short firstpoint;
+    unsigned int count;
+    unsigned char map;
+    unsigned char view;
+
+    switch(GET_ACTION(action)) {
+        case ACTION_NONE:
+            fprintf(stderr, "None");
+            break;
+        case ACTION_WARP:
+            decode_warp(action, &map, &view);
+            fprintf(stderr, "Warp %hhu %hhu", map, view);
+            break;
+        case ACTION_WAYPOINT:
+            decode_waypoint(action, &firstpoint, &count);
+            fprintf(stderr, "Waypoint %hu %hhu", firstpoint, count);
+            break;
+        default:
+            fprintf(stderr, "Unknown");
+            break;
+    }
+}
+
+char *find_non_space(char *str) {
+    int i;
+
+    for(i = 0; str[i] != ' ' || str[i] == '\0'; i++);
+
+    return(&str[i]);
+}
+
+int parse_point(char *str, float *x, float *y) {
+    char *word;
+    char *wordend;
+
+    word = find_non_space(str);
+    if(*word == '\0') {
+        return(-1);
+    }
+
+    *x = strtof(word, &wordend);
+    if(wordend == word || *wordend != ' ') {
+        return(-1);
+    }
+    word = find_non_space(wordend);
+    if(*word == '\0') {
+        return(-1);
+    }
+    *y = strtof(word, &wordend);
+    if(wordend == word) {
+        return(-1);
+    }
+
+    return(0);
+}
+
+void print_menu(int waypoints) {
+    Sector *sector = &(*s)[s_sector];
+    unsigned short firstpoint;
+    unsigned int count;
+    int i;
+
+    fprintf(stderr, "Sector %d %08X ", s_sector, sector->action);
+    print_action(sector->action);
+    fprintf(stderr, "\n");
+
+    if(waypoints) {
+        if(GET_ACTION(sector->action) == ACTION_WAYPOINT) {
+            fprintf(stderr, "Waypoints:\n");
+            decode_waypoint(sector->action, &firstpoint, &count);
+            for(i = firstpoint; i < firstpoint + count; i++) {
+                fprintf(stderr, "%d: (%f, %f)\n", i - firstpoint, (*p)[i].x, (*p)[i].y);
+            }
+        }
+    }
+
+    fprintf(stderr, "Enter selection: (none, warp <map> <view>, ");
+    if(GET_ACTION(sector->action) == ACTION_WAYPOINT) {
+        fprintf(stderr, "add <waypoint x> <waypoint y>, delete <waypoint index>, list");
+    } else {
+        fprintf(stderr, "waypoint <waypoint x>, <waypoint y>");
+    }
+    fprintf(stderr, ", quit)\n");
+}
+
+void prompt_action_menu_cb(char *str) {
+    Sector *sector = &(*s)[s_sector];
+    char orig;
+    char *word;
+    char *wordend;
+
+    word = str;
+    wordend = strchr(str, ' ');
+    if(wordend != NULL) {
+        orig = *wordend;
+        *wordend = '\0';
+    } else {
+        /* note to following code of end of string */
+        orig = '\0';
+    }
+
+    if(strcasecmp(word, "none") == 0) {
+        if(set_action_none(s_sector) == 0) {
+            fprintf(stderr, "Set sector %d action to none.\n", s_sector);
+        }
+        goto finish;
+    } else if(strcasecmp(word, "warp") == 0) {
+        long map;
+        long view;
+
+        if(orig == '\0') {
+            goto error_warp;
+        }
+        *wordend = orig;
+        word = find_non_space(wordend);
+        if(*word == '\0') {
+            goto error_warp;
+        }
+
+        map = strtol(word, &wordend, 10);
+        if(wordend == word || *wordend != ' ') {
+            goto error_warp;
+        }
+        word = find_non_space(wordend);
+        if(*word == '\0') {
+            goto error_warp;
+        }
+        view = strtol(word, &wordend, 10);
+        if(wordend == word) {
+            goto error_warp;
+        }
+
+        map &= 0xFF;
+        view &= 0xFF;
+        if(set_action_warp(s_sector, map, view) == 0) {
+            fprintf(stderr, "Set sector %d action to warp to map %ld view %ld.\n", s_sector, map, view);
+        }
+        goto finish;
+    } else if(strcasecmp(word, "quit") == 0) {
+        return;
+    } else {
+        float x, y;
+        long waypoint;
+
+        if(GET_ACTION(sector->action) == ACTION_WAYPOINT) {
+            if(strcasecmp(word, "add") == 0 ||
+               strcasecmp(word, "waypoint") == 0) {
+                if(orig == '\0') {
+                    goto error_add;
+                }
+                *wordend = orig;
+                if(parse_point(wordend, &x, &y) < 0) {
+                    goto error_add;
+                }
+
+                if(add_waypoint(s_sector, x, y) == 0) {
+                    fprintf(stderr, "Added to sector %d waypoint at (%f, %f).\n", s_sector, x, y);
+                }
+                goto finish;
+                return;
+            } else if(strcasecmp(word, "delete") == 0) {
+                if(orig == '\0') {
+                    goto error_delete;
+                }
+                *wordend = orig;
+
+                word = find_non_space(wordend);
+                if(*word == '\0') {
+                    goto error_delete;
+                }
+                waypoint = strtol(word, &wordend, 10);
+                if(wordend == word) {
+                    goto error_delete;
+                }
+
+                if(delete_waypoint(s_sector, waypoint) == 0) {
+                    fprintf(stderr, "Deleted waypoint %ld from sector %d.\n", waypoint, s_sector);
+                }
+                goto finish;
+            } else if(strcasecmp(word, "list") == 0) {
+                print_menu(1);
+                goto prompt_only;
+            }
+        } else {
+            if(strcasecmp(word, "waypoint") == 0) {
+                if(orig == '\0') {
+                    goto error_waypoint;
+                }
+                *wordend = orig;
+                if(parse_point(wordend, &x, &y) < 0) {
+                    goto error_waypoint;
+                }
+
+                if(set_action_waypoint(s_sector, x, y) == 0) {
+                    fprintf(stderr, "Set sector %d action to waypoint with first point at (%f, %f).\n", s_sector, x, y);
+                }
+                goto finish;
+            }
+        }
+    }
+
+    fprintf(stderr, "Unknown selection %s.\n", word);
+    goto finish;
+
+error_add:
+    fprintf(stderr, "add needs an X and Y.\n");
+    goto finish;
+error_delete:
+    fprintf(stderr, "delete needs a waypoint index.\n");
+    goto finish;
+error_warp:
+    fprintf(stderr, "warp needs a map and view.\n");
+    goto finish;
+error_waypoint:
+    fprintf(stderr, "waypoint needs an X and Y.\n");
+finish:
+    print_menu(0);
+prompt_only:
+    fprintf(stderr, "\nSelection: ");
+    start_prompt(prompt_action_menu_cb);
+    return;
+}
+
+void action_menu() {
+    print_menu(1);
+    fprintf(stderr, "\nSelection: ");
+    start_prompt(prompt_action_menu_cb);
 }
 
 int main(int argc, char **argv) {
@@ -1125,6 +1356,11 @@ int main(int argc, char **argv) {
                             case SDLK_W:
                                 if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
                                     save_file();
+                                }
+                                break;
+                            case SDLK_A:
+                                if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
+                                    action_menu();
                                 }
                                 break;
                             case SDLK_TAB:

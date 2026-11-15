@@ -50,6 +50,8 @@ R - like T but for transform (texture transformed based on world coordinates).
         texture X, Y).
       Sector mode:
         Requires entering a new 2x2 matrix (world X, Y in to texture X, Y).
+CTRL+A - Sector mode:
+           Manage sector action.
 I - Print information on any highlighted item in the current mode.
 TAB - Change target mode for actions between point, line and sector modes.
       Also affects which is highlighted for selection and cursor hover.

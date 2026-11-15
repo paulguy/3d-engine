@@ -207,11 +207,38 @@ open_map_t open_map_p;
 read_map_t read_map_p;
 close_map_t close_map_p;
 
-#ifndef EDITOR
-static
-#endif
+void decode_waypoint(unsigned int action,
+                     unsigned short *firstpoint,
+                     unsigned int *count) {
+    *firstpoint = (action & 0xFFFF00) >> 8;
+    /* avoid division by 0 by adding 1 */
+    *count = ((action & 0xFF000000) >> 24) + 1;
+}
+
+void decode_warp(unsigned int action,
+                 unsigned char *map,
+                 unsigned char *view) {
+    *map = (action & 0xFF00) >> 8;
+    *view = (action & 0xFF0000) >> 16;
+}
+
+unsigned int encode_waypoint(unsigned short firstpoint,
+                             unsigned int count) {
+    return(ACTION_WAYPOINT | (firstpoint << 8) | ((count - 1) << 24));
+}
+
+unsigned int encode_warp(unsigned short map,
+                         unsigned int view) {
+    return(ACTION_WARP | (map << 8) | (view << 16));
+}
+
+#ifdef EDITOR
 void print_data(Header *h) {
     int i;
+    unsigned short firstpoint;
+    unsigned int count;
+    unsigned char map;
+    unsigned char view;
 
     LOG("%hu %hu %hu %hu %hu %hu %hu %hu %hu\n", h->points, h->matrix2x2s, h->matrix3x2s, h->walls, h->lines, h->flats, h->sectors, h->links, h->views);
 
@@ -248,15 +275,17 @@ void print_data(Header *h) {
             (*s)[i].height[CEILING], (*s)[i].height[FLOOR],
             (*s)[i].flat[CEILING], (*s)[i].flat[FLOOR],
             (*s)[i].firstline, (*s)[i].lines);
-        switch((*s)[i].action & 0xFF) {
+        switch(GET_ACTION((*s)[i].action)) {
             case ACTION_NONE:
                 LOG("None\n");
                 break;
             case ACTION_WARP:
-                LOG("Warp %hhu %hhu\n", ((*s)[i].action & 0xFF00) >> 8, ((*s)[i].action & 0xFF0000) >> 16);
+                decode_warp((*s)[i].action, &map, &view);
+                LOG("Warp %hhu %hhu\n", map, view);
                 break;
             case ACTION_WAYPOINT:
-                LOG("Waypoint %hu %hhu\n", ((*s)[i].action & 0xFFFF00) >> 8, ((*s)[i].action & 0xFF000000) >> 24);
+                decode_waypoint((*s)[i].action, &firstpoint, &count);
+                LOG("Waypoint %hu %hhu\n", firstpoint, count);
                 break;
             default:
                 LOG("Unknown\n");
@@ -267,6 +296,7 @@ void print_data(Header *h) {
         v.start, v.pos.x, v.pos.y,
         v.angle, v.startheight, v.height, v.fov);
 }
+#endif
 
 void apply_view_data(View_data *view) {
     v.start = view->start;
@@ -281,14 +311,6 @@ void apply_view_data(View_data *view) {
 }
 
 int init_map();
-
-void decode_waypoint(unsigned int action,
-                     unsigned short *firstpoint,
-                     unsigned int *count) {
-    *firstpoint = (action & 0xFFFF00) >> 8;
-    /* avoid division by 0 by adding 1 */
-    *count = ((action & 0xFF000000) >> 24) + 1;
-}
 
 int engine_load(unsigned char number, unsigned char view) {
 #ifndef EDITOR
@@ -490,7 +512,7 @@ int engine_load(unsigned char number, unsigned char view) {
         unsigned int count;
         unsigned int j;
 
-        if((d.s.action & 0xFF) == ACTION_WAYPOINT) {
+        if(GET_ACTION(d.s.action) == ACTION_WAYPOINT) {
             decode_waypoint(d.s.action, &firstpoint, &count);
             for(j = firstpoint; j < firstpoint + count; j++) {
                 point_refs[j]++;
@@ -530,10 +552,13 @@ int engine_load(unsigned char number, unsigned char view) {
 
     close_map_p();
 
+#ifdef EDITOR
+    print_data(&h);
+#endif
+
 #ifdef BROKEN_MATH
     LOG("Post-load %d bytes\n", heap_bytes_free());
 #else
-    print_data(&h);
     LOG("Memory in bytes - Points %d Matrix2x2s %d Matrix3x2s %d Walls %d Lines %d Flats %d Sectors %d Total %d\n",
          h.points * sizeof(Point), h.matrix2x2s * sizeof(Matrix2x2), h.matrix3x2s * sizeof(Matrix3x2), h.walls * sizeof(Wall), h.lines * sizeof(Line),h.flats * sizeof(Flat), h.sectors * sizeof(Sector),
         (h.points * sizeof(Point)) + (h.matrix2x2s * sizeof(Matrix2x2)) + (h.matrix3x2s * sizeof(Matrix3x2)) + (h.walls * sizeof(Wall)) + (h.lines * sizeof(Line)) + (h.flats * sizeof(Flat)) + (h.sectors * sizeof(Sector)));
@@ -1276,10 +1301,12 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
 }
 
 int do_action(Sector *sector) {
-    switch(sector->action & 0xFF) {
+    switch(GET_ACTION(sector->action)) {
         case ACTION_WARP:
-            unsigned char map = (sector->action & 0xFF00) >> 8;
-            unsigned char view = (sector->action & 0xFF0000) >> 16;
+            unsigned char map;
+            unsigned char view;
+            decode_warp(sector->action, &map, &view);
+
             if(map == mapnum) {
                 /* views aren't stored, so load the view from file */
 
@@ -1610,7 +1637,7 @@ int get_hit(int mx, int my,
     }
 
     /* this can be a useful message, but it's noisy 
-    fprintf(stderr, "Hit missed!\n");
+    LOG("Hit missed!\n");
     */
     return(-1);
 }
@@ -1675,7 +1702,7 @@ int get_point(unsigned int x, unsigned int y,
         }
     }
     if(point1 == NULL) {
-        fprintf(stderr, "Couldn't find line in sector for point!  This is a bug.\n");
+        LOG("Couldn't find line in sector for point.  This is a bug!\n");
         return(-1);
     }
 
@@ -1821,12 +1848,33 @@ void place_view_somewhere_sensible() {
 int add_point(float x, float y) {
     Point (*new_p)[];
     int *new_point_refs;
-    unsigned int i;
+    unsigned int i, j;
+
+    unsigned short firstpoint;
+    unsigned int count;
+    int found;
 
     if(h.points > 0) {
         /* try to find the point */
         for(i = 0; i < h.points; i++) {
             if((*p)[i].x == x && (*p)[i].y == y) {
+                /* make sure point isn't in a waypoint list */
+                found = 0;
+                for(j = 0; j < h.sectors; j++) {
+                    if(GET_ACTION((*s)[j].action) == ACTION_WAYPOINT) {
+                        decode_waypoint((*s)[j].action,
+                                        &firstpoint,
+                                        &count);
+                        if(i >= firstpoint && i < firstpoint + count) {
+                            found = 1;
+                            break;
+                        }
+                    }
+                }
+                if(found) {
+                    continue;
+                }
+
                 point_refs[i]++;
                 return(i);
             }
@@ -1836,13 +1884,13 @@ int add_point(float x, float y) {
     /* resize array */
     new_p = realloc(p, (h.points + 1) * sizeof(Point));
     if(new_p == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     p = new_p;
     new_point_refs = realloc(point_refs, (h.points + 1) * sizeof(int));
     if(new_point_refs == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     point_refs = new_point_refs;
@@ -1854,50 +1902,61 @@ int add_point(float x, float y) {
     return(h.points-1);
 }
 
-int deref_point(int pindex) {
+int delete_points(int pindex, int amount) {
     Point (*new_p)[];
     int *new_point_refs;
     int i;
 
+    if(pindex + amount > h.points) {
+        LOG("Call to delete points past end of points array (%d + %d > %d).  This is a bug!\n", pindex, amount, h.points);
+        return(-1);
+    }
+
+    if(pindex < h.points - amount) {
+        /* if this isn't the last entry, shift everything back and repoint everything */
+        memmove(&(*p)[pindex], &(*p)[pindex + amount], sizeof(Point) * (h.points - (pindex + amount)));
+        memmove(&point_refs[pindex], &point_refs[pindex + amount], sizeof(int) * (h.points - (pindex + amount)));
+        /* wall, line, flat */
+        for(i = 0; i < h.walls; i++) {
+            if((*w)[i].bias > pindex) {
+                (*w)[i].bias -= amount;
+            }
+        }
+
+        for(i = 0; i < h.lines; i++) {
+            if((*l)[i].point > pindex) {
+                (*l)[i].point -= amount;
+            }
+        }
+
+        for(i = 0; i < h.flats; i++) {
+            if((*f)[i].bias > pindex) {
+                (*f)[i].bias -= amount;
+            }
+        }
+    }
+    /* resize the arrays */
+    new_p = realloc(p, (h.points - amount) * sizeof(Point));
+    if(new_p == NULL) {
+        LOG("realloc() failed\n");
+        return(-1);
+    }
+    p = new_p;
+    new_point_refs = realloc(point_refs, (h.points - amount) * sizeof(int));
+    if(new_point_refs == NULL) {
+        LOG("realloc() failed\n");
+        return(-1);
+    }
+    point_refs = new_point_refs;
+    h.points -= amount;
+
+    return(0);
+}
+
+int deref_point(int pindex) {
     point_refs[pindex]--;
     if(point_refs[pindex] == 0) {
-        if(pindex < h.points - 1) {
-            /* if this isn't the last entry, shift everything back and repoint everything */
-            memmove(&(*p)[pindex], &(*p)[pindex+1], sizeof(Point) * (h.points - (pindex + 1)));
-            memmove(&point_refs[pindex], &point_refs[pindex+1], sizeof(int) * (h.points - (pindex + 1)));
-            /* wall, line, flat */
-            for(i = 0; i < h.walls; i++) {
-                if((*w)[i].bias > pindex) {
-                    (*w)[i].bias--;
-                }
-            }
-
-            for(i = 0; i < h.lines; i++) {
-                if((*l)[i].point > pindex) {
-                    (*l)[i].point--;
-                }
-            }
-
-            for(i = 0; i < h.flats; i++) {
-                if((*f)[i].bias > pindex) {
-                    (*f)[i].bias--;
-                }
-            }
-        }
-        /* resize the arrays */
-        new_p = realloc(p, (h.points - 1) * sizeof(Point));
-        if(new_p == NULL) {
-            fprintf(stderr, "realloc() failed\n");
-            return(-1);
-        }
-        p = new_p;
-        new_point_refs = realloc(point_refs, (h.points - 1) * sizeof(int));
-        if(new_point_refs == NULL) {
-            fprintf(stderr, "realloc() failed\n");
-            return(-1);
-        }
-        point_refs = new_point_refs;
-        h.points--;
+        return(delete_points(pindex, 1));
     }
 
     return(0);
@@ -1932,6 +1991,93 @@ int modify_point(int pindex,
     return(new_pindex);
 }
 
+int expand_points(int index, int amount) {
+    /* this function is just used for managing waypoints, so it doesn't need to do everything */
+
+    Point (*new_p)[];
+    int *new_p_refs;
+    int i;
+
+    /* resize array */
+    new_p = realloc(p, (h.points + amount) * sizeof(Point));
+    if(new_p == NULL) {
+        LOG("realloc() failed\n");
+        return(-1);
+    }
+    p = new_p;
+    new_p_refs = realloc(point_refs, (h.points + amount) * sizeof(int));
+    if(new_p_refs == NULL) {
+        LOG("realloc() failed\n");
+        return(-1);
+    }
+    point_refs = new_p_refs;
+
+    if(index < h.points) {
+        unsigned short firstpoint;
+        unsigned int count;
+
+        /* make the space */
+        memmove(&(*p)[index + amount], &(*p)[index], sizeof(Point) * (h.points - index));
+        /* repoint lines, walls, flats, sector waypoint actions, views */
+        for(i = 0; i < h.lines; i++) {
+            if((*l)[i].point >= index) {
+                (*l)[i].point += amount;
+            }
+        }
+
+        for(i = 0; i < h.walls; i++) {
+            if((*w)[i].bias >= index) {
+                (*w)[i].bias += amount;
+            }
+        }
+
+        for(i = 0; i < h.flats; i++) {
+            if((*f)[i].bias >= index) {
+                (*f)[i].bias += amount;
+            }
+        }
+
+        for(i = 0; i < h.sectors; i++) {
+            if(GET_ACTION((*s)[i].action) == ACTION_WAYPOINT) {
+                decode_waypoint((*s)[i].action, &firstpoint, &count);
+                if(firstpoint >= index) {
+                    (*s)[i].action = encode_waypoint(firstpoint + amount, count);
+                }
+            }
+        }
+
+        for(i = 0; i < h.views; i++) {
+            if((*vs)[i].pos >= index) {
+                (*vs)[i].pos += amount;
+            }
+        }
+    }
+
+    for(i = index; i < index + amount; i++) {
+        point_refs[i] = 1;
+    }
+
+    h.points += amount;
+
+    return(0);
+}
+
+int insert_point(int index,
+                 float x, float y) {
+    Point *point;
+
+    if(expand_points(index, 1) < 0) {
+        return(-1);
+    }
+    /* get pointer here after line array may have moved */
+    point = &(*p)[index];
+
+    point->x = x;
+    point->y = y;
+
+    return(0);
+}
+
 int add_matrix2x2(float xx, float xy,
                   float yx, float yy) {
     Matrix2x2 (*new_m22)[];
@@ -1952,13 +2098,13 @@ int add_matrix2x2(float xx, float xy,
     /* resize array */
     new_m22 = realloc(m22, (h.matrix2x2s + 1) * sizeof(Matrix2x2));
     if(new_m22 == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     m22 = new_m22;
     new_m22_refs = realloc(m22_refs, (h.matrix2x2s + 1) * sizeof(int));
     if(new_m22_refs == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     m22_refs = new_m22_refs;
@@ -1993,13 +2139,13 @@ int deref_matrix2x2(int m22index) {
         /* resize the arrays */
         new_m22 = realloc(m22, (h.matrix2x2s - 1) * sizeof(Matrix2x2));
         if(new_m22 == NULL) {
-            fprintf(stderr, "realloc() failed\n");
+            LOG("realloc() failed\n");
             return(-1);
         }
         m22 = new_m22;
         new_m22_refs = realloc(m22_refs, (h.matrix2x2s - 1) * sizeof(int));
         if(new_m22_refs == NULL) {
-            fprintf(stderr, "realloc() failed\n");
+            LOG("realloc() failed\n");
             return(-1);
         }
         m22_refs = new_m22_refs;
@@ -2063,13 +2209,13 @@ int add_matrix3x2(float xx, float xy, float xz,
     /* resize array */
     new_m32 = realloc(m32, (h.matrix3x2s + 1) * sizeof(Matrix3x2));
     if(new_m32 == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     m32 = new_m32;
     new_m32_refs = realloc(m32_refs, (h.matrix3x2s + 1) * sizeof(int));
     if(new_m32_refs == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     m32_refs = new_m32_refs;
@@ -2106,13 +2252,13 @@ int deref_matrix3x2(int m32index) {
         /* resize the arrays */
         new_m32 = realloc(m32, (h.matrix3x2s - 1) * sizeof(Matrix3x2));
         if(new_m32 == NULL) {
-            fprintf(stderr, "realloc() failed\n");
+            LOG("realloc() failed\n");
             return(-1);
         }
         m32 = new_m32;
         new_m32_refs = realloc(m32_refs, (h.matrix3x2s - 1) * sizeof(int));
         if(new_m32_refs == NULL) {
-            fprintf(stderr, "realloc() failed\n");
+            LOG("realloc() failed\n");
             return(-1);
         }
         m32_refs = new_m32_refs;
@@ -2182,13 +2328,13 @@ int add_wall(unsigned char texture,
     /* resize array */
     new_w = realloc(w, (h.walls + 1) * sizeof(Wall));
     if(new_w == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     w = new_w;
     new_wall_refs = realloc(wall_refs, (h.walls + 1) * sizeof(int));
     if(new_wall_refs == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     wall_refs = new_wall_refs;
@@ -2225,13 +2371,13 @@ int deref_wall(int windex) {
         /* resize the arrays */
         new_w = realloc(w, (h.walls - 1) * sizeof(Wall));
         if(new_w == NULL) {
-            fprintf(stderr, "realloc() failed\n");
+            LOG("realloc() failed\n");
             return(-1);
         }
         w = new_w;
         new_wall_refs = realloc(wall_refs, (h.walls - 1) * sizeof(int));
         if(new_wall_refs == NULL) {
-            fprintf(stderr, "realloc() failed\n");
+            LOG("realloc() failed\n");
             return(-1);
         }
         wall_refs = new_wall_refs;
@@ -2302,13 +2448,13 @@ int add_flat(unsigned char texture,
     /* resize array */
     new_f = realloc(f, (h.flats + 1) * sizeof(Flat));
     if(new_f == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     f = new_f;
     new_flat_refs = realloc(flat_refs, (h.flats + 1) * sizeof(int));
     if(new_flat_refs == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     flat_refs = new_flat_refs;
@@ -2345,13 +2491,13 @@ int deref_flat(int findex) {
         /* resize the arrays */
         new_f = realloc(f, (h.flats - 1) * sizeof(Flat));
         if(new_f == NULL) {
-            fprintf(stderr, "realloc() failed\n");
+            LOG("realloc() failed\n");
             return(-1);
         }
         f = new_f;
         new_flat_refs = realloc(flat_refs, (h.flats - 1) * sizeof(int));
         if(new_flat_refs == NULL) {
-            fprintf(stderr, "realloc() failed\n");
+            LOG("realloc() failed\n");
             return(-1);
         }
         flat_refs = new_flat_refs;
@@ -2406,7 +2552,7 @@ int add_line(int point, int sector,
     /* resize array */
     new_l = realloc(l, (h.lines + 1) * sizeof(Line));
     if(new_l == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     l = new_l;
@@ -2430,7 +2576,7 @@ int expand_lines(int index, int amount) {
     /* resize array */
     new_l = realloc(l, (h.lines + amount) * sizeof(Line));
     if(new_l == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     l = new_l;
@@ -2479,41 +2625,50 @@ int insert_line(int index,
     return(0);
 }
 
-int delete_line(int index) {
-    Line *line = &(*l)[index];
+int delete_lines(int index, int amount) {
+    Line *line;
     Line (*new_l)[];
     int i;
 
-    if(deref_point(line->point) < 0) {
-        return(-1);
-    }
-    if(deref_wall(line->wall[CEILING]) < 0) {
-        return(-1);
-    }
-    if(deref_wall(line->wall[FLOOR]) < 0) {
+    if(index + amount > h.lines) {
+        LOG("Call to delete lines past end of lines array (%d + %d > %d).  This is a bug!\n", index, amount, h.lines);
         return(-1);
     }
 
-    if(index < h.lines - 1) {
+    for(i = index; i < index + amount; i++) {
+        line = &(*l)[i];
+
+        if(deref_point(line->point) < 0) {
+            return(-1);
+        }
+        if(deref_wall(line->wall[CEILING]) < 0) {
+            return(-1);
+        }
+        if(deref_wall(line->wall[FLOOR]) < 0) {
+            return(-1);
+        }
+    }
+
+    if(index < h.lines - amount) {
         /* move the rest inward */
-        memmove(&(*l)[index], &(*l)[index + 1], sizeof(Line) * (h.lines - (index + 1)));
+        memmove(&(*l)[index], &(*l)[index + amount], sizeof(Line) * (h.lines - (index + amount)));
         /* repoint sectors with firstline after this index */
         for(i = 0; i < h.sectors; i++) {
             if((*s)[i].firstline > index) {
-                (*s)[i].firstline--;
+                (*s)[i].firstline -= amount;
             }
         }
     }
 
     /* resize array */
-    new_l = realloc(l, (h.lines - 1) * sizeof(Line));
+    new_l = realloc(l, (h.lines - amount) * sizeof(Line));
     if(new_l == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     l = new_l;
 
-    h.lines--;
+    h.lines -= amount;
 
     return(0);
 }
@@ -2578,7 +2733,7 @@ int find_opposite_line(int sindex, int lindex) {
 
     /* if no opposite sector, there won't be an opposite line */
     if(line->sector == NO_SECTOR) {
-        fprintf(stderr, "No opposite sector to find opposite line on.\n");
+        LOG("No opposite sector to find opposite line on.\n");
         return(-1);
     }
 
@@ -2594,7 +2749,7 @@ int find_opposite_line(int sindex, int lindex) {
         }
     }
 
-    fprintf(stderr, "Opposite sector doesn't share common points!  This is a bug.\n");
+    LOG("Opposite sector doesn't share common points!  This is a bug.\n");
     return(-1);
 }
 
@@ -2622,7 +2777,7 @@ int find_line(int sindex, int pindex) {
         }
     }
 
-    fprintf(stderr, "Couldn't find line in sector by point.\n");
+    LOG("Couldn't find line in sector by point.\n");
     return(-1);
 }
 
@@ -2638,7 +2793,7 @@ int join_lines(int sindex, int pindex) {
 
     if(sector->lines <= 3) {
         /* don't let a sector have less than 3 points */
-        fprintf(stderr, "Sector would have less than 3 points.\n");
+        LOG("Sector would have less than 3 points.\n");
         return(-1);
     }
 
@@ -2651,7 +2806,7 @@ int join_lines(int sindex, int pindex) {
         /* get this pointer first in case the line pointer moves */
         other_sector = &(*s)[line->sector];
         other_lindex = find_line(line->sector, pindex);
-        if(delete_line(other_lindex) < 0) {
+        if(delete_lines(other_lindex, 1) < 0) {
             return(-1);
         }
         other_sector->lines--;
@@ -2664,7 +2819,7 @@ int join_lines(int sindex, int pindex) {
     }
 
     /* delete the line with this point */
-    if(delete_line(lindex) < 0) {
+    if(delete_lines(lindex, 1) < 0) {
         return(-1);
     }
     sector->lines--;
@@ -2766,14 +2921,14 @@ void repoint_lines(int sindex, int lindex1, int lindex2, int new_sindex) {
     int other_lindex;
     int i;
 
-    fprintf(stderr, "Following errors about sector lines aren't errors.\n");
+    LOG("Following errors about sector lines aren't errors.\n");
     for(i = lindex1; i < lindex2; i++) {
         other_lindex = find_opposite_line(sindex, i);
         if(other_lindex >= 0) {
             (*l)[other_lindex].sector = new_sindex;
         }
     }
-    fprintf(stderr, "Following errors about sector lines may be errors.\n");
+    LOG("Following errors about sector lines may be errors.\n");
 }
 
 int delete_sector(int sindex) {
@@ -2783,7 +2938,7 @@ int delete_sector(int sindex) {
 
     if(sindex == v.start) {
         /* don't delete the view sector because this will just crash */
-        fprintf(stderr, "Tried to delete view sector.\n");
+        LOG("Tried to delete view sector.\n");
         return(-1);
     }
 
@@ -2797,10 +2952,16 @@ int delete_sector(int sindex) {
     if(sindex < h.sectors - 1) {
         /* move the rest inward */
         memmove(&(*s)[sindex], &(*s)[sindex + 1], sizeof(Sector) * (h.sectors - (sindex + 1)));
-        /* repoint lines with sector after this index */
+        /* repoint lines, view datas with sector after this index */
         for(i = 0; i < h.lines; i++) {
             if((*l)[i].sector != NO_SECTOR && (*l)[i].sector > sindex) {
                 (*l)[i].sector--;
+            }
+        }
+
+        for(i = 0; i < h.views; i++) {
+            if((*vs)[i].start > sindex) {
+                (*vs)[i].start--;
             }
         }
     }
@@ -2808,7 +2969,7 @@ int delete_sector(int sindex) {
     /* resize array */
     new_s = realloc(s, (h.sectors - 1) * sizeof(Sector));
     if(new_s == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     s = new_s;
@@ -2827,7 +2988,7 @@ int add_sector(unsigned short firstline, unsigned char lines,
 
     new_s = realloc(s, (h.sectors + 1) * sizeof(Sector));
     if(new_s == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     s = new_s;
@@ -2860,7 +3021,7 @@ int split_sector(int sindex, int pindex1, int pindex2) {
     lindex1 = find_line(sindex, pindex1);
     lindex2 = find_line(sindex, pindex2);
     if(lindex1 < 0 || lindex2 < 0) {
-        fprintf(stderr, "Make sure the correct sector is selected with TAB and that both points are at the edge of that sector.\n");
+        LOG("Make sure the correct sector is selected with TAB and that both points are at the edge of that sector.\n");
         return(-1);
     }
     /* make sure 2 is after 1 */
@@ -2877,7 +3038,7 @@ int split_sector(int sindex, int pindex1, int pindex2) {
     /* 2 is used because the connecting line will be 3 */
     if(lindex2 - lindex1 < 2 ||
        (lindex1 - sector->firstline) + (sector->firstline + sector->lines - lindex2) < 2) {
-        fprintf(stderr, "Sector split would leave 1 side with less than 3 lines.\n");
+        LOG("Sector split would leave 1 side with less than 3 lines.\n");
         return(-1);
     }
 
@@ -2886,7 +3047,7 @@ int split_sector(int sindex, int pindex1, int pindex2) {
     /* make room for the new sector */
     new_s = realloc(s, (h.sectors + 1) * sizeof(Sector));
     if(new_s == NULL) {
-        fprintf(stderr, "realloc() failed\n");
+        LOG("realloc() failed\n");
         return(-1);
     }
     s = new_s;
@@ -2982,7 +3143,7 @@ int find_line_sector(int lindex) {
         }
     }
 
-    fprintf(stderr, "Couldn't find sector for line!  This is a bug.\n");
+    LOG("Couldn't find sector for line!  This is a bug.\n");
     return(-1);
 }
 
@@ -3013,7 +3174,7 @@ int link_sectors(int sindex, int lindex) {
         }
     }
     if(other_lindex < 0) {
-        fprintf(stderr, "Couldn't find the other line which shares points with this line.\n");
+        LOG("Couldn't find the other line which shares points with this line.\n");
         return(-1);
     }
 
@@ -3036,7 +3197,7 @@ int join_sectors(int sindex, int lindex) {
 
     if(other_sindex == NO_SECTOR) {
         /* no other sector */
-        fprintf(stderr, "No other sector to join.\n");
+        LOG("No other sector to join.\n");
         return(-1);
     }
     other_lindex = find_opposite_line(sindex, lindex);
@@ -3187,6 +3348,106 @@ int set_sector_transform(int sindex, int which,
     return(0);
 }
 
+int clear_waypoints(Sector *sector) {
+    unsigned short firstpoint;
+    unsigned int count;
+
+    if(GET_ACTION(sector->action) == ACTION_WAYPOINT) {
+        decode_waypoint(sector->action,
+                        &firstpoint,
+                        &count);
+        /* don't use the normal refcounted delete function as waypoint arrays aren't included in the refcounted points */
+        if(delete_points(firstpoint, count) < 0) {
+            return(-1);
+        }
+    }
+
+    return(0);
+}
+
+int set_action_none(int sindex) {
+    Sector *sector = &(*s)[sindex];
+    if(clear_waypoints(sector) < 0) {
+        return(-1);
+    }
+
+    sector->action = ACTION_NONE;
+
+    return(0);
+}
+
+int set_action_warp(int sindex, unsigned char map, unsigned char view) {
+    Sector *sector = &(*s)[sindex];
+    if(clear_waypoints(sector) < 0) {
+        return(-1);
+    }
+
+    sector->action = encode_warp(map, view);
+
+    return(0);
+}
+
+int add_waypoint(int sindex, float x, float y) {
+    Sector *sector = &(*s)[sindex];
+    unsigned short firstpoint;
+    unsigned int count;
+
+    decode_waypoint(sector->action,
+                    &firstpoint,
+                    &count);
+    if(insert_point(firstpoint + count, x, y) < 0) {
+        return(-1);
+    }
+
+    sector->action = encode_waypoint(firstpoint, count + 1);
+
+    return(0);
+}
+
+int set_action_waypoint(int sindex, float x, float y) {
+    Sector *sector = &(*s)[sindex];
+    int newpoint;
+
+    if(GET_ACTION(sector->action) == ACTION_WAYPOINT) {
+        LOG("WARNING: Sector %d action is already waypoint.  Adding point.\n");
+        return(add_waypoint(sindex, x, y));
+    }
+
+    newpoint = h.points;
+    if(insert_point(h.points, x, y) < 0) {
+        return(-1);
+    }
+    sector->action = encode_waypoint(newpoint, 1);
+
+    return(1);
+}
+
+int delete_waypoint(int sindex, int index) {
+    Sector *sector = &(*s)[sindex];
+    unsigned short firstpoint;
+    unsigned int count;
+    decode_waypoint(sector->action,
+                    &firstpoint,
+                    &count);
+    if(index < 0 || index >= count) {
+        LOG("Index %d is out of range.\n", index);
+        return(-1);
+    }
+
+    if(count == 1) {
+        /* clears the last waypoint */
+        set_action_none(sindex);
+    } else {
+        if(delete_points(firstpoint + index, 1) < 0) {
+            return(-1);
+        }
+
+        sector->action = encode_waypoint(firstpoint, count - 1);
+    }
+
+    return(0);
+}
+
 int init_map() {
     /* set up a square room with no textures and the view in the middle, and initialize point refs */
     int firstpoint;
@@ -3196,6 +3457,9 @@ int init_map() {
     int north_wall, south_wall, west_wall, east_wall;
     int flat_1x;
     int top_flat, bottom_flat;
+    /*
+    int view_pos;
+    */
 
     h.points = 0;
     h.matrix2x2s = 0;
@@ -3292,6 +3556,14 @@ int init_map() {
         return(-1);
     }
 
+    /*
+    view_pos = add_point(0.0, 0.0);
+    if(view_pos < 0) {
+        return(-1);
+    }
+    */
+    /* TODO add view_data management functions and actually add initial view */
+
     v.pos.x = 0.0;
     v.pos.y = 0.0;
     v.angle = 0.0;
@@ -3321,7 +3593,7 @@ void save_file() {
 
     out = fopen(name, "wb");
     if(out == NULL) {
-        fprintf(stderr, "Opening %s for writing failed.\n", name);
+        LOG("Opening %s for writing failed.\n", name);
         return;
     }
 
@@ -3345,13 +3617,13 @@ void save_file() {
                 if(!found) {
                     other_lindex = find_opposite_line(i, sector->firstline + j);
                     if(other_lindex < 0) {
-                        fprintf(stderr, "WARNING: Other lindex couldn't be found on a linked line.  This is a bug!  Continuing anyway...\n");
+                        LOG("WARNING: Other lindex couldn't be found on a linked line.  This is a bug!  Continuing anyway...\n");
                         continue;
                     }
 
                     new_li = realloc(li, (h.links + 1) * sizeof(Link_data));
                     if(new_li == NULL) {
-                        fprintf(stderr, "realloc() failed\n");
+                        LOG("realloc() failed\n");
                         goto error;
                     }
                     li = new_li;
@@ -3366,14 +3638,12 @@ void save_file() {
             }
         }
     }
-    /* TODO: add/list/remove views */
-    h.views = 1;
 
     /* view points are referenced from the point list */
     viewpoint = add_point(v.pos.x, v.pos.y);
 
     if(fwrite(&h, 1, sizeof(Header), out) < sizeof(Header)) {
-        fprintf(stderr, "Writing header failed.\n");
+        LOG("Writing header failed.\n");
         goto error;
     }
 
@@ -3381,7 +3651,7 @@ void save_file() {
         d.p.x = (*p)[i].x;
         d.p.y = (*p)[i].y;
         if(fwrite(&d.p, 1, sizeof(d.p), out) < sizeof(d.p)) {
-            fprintf(stderr, "Writing point failed.\n");
+            LOG("Writing point failed.\n");
             goto error;
         }
     }
@@ -3392,7 +3662,7 @@ void save_file() {
         d.m22.yx = (*m22)[i].yx;
         d.m22.yy = (*m22)[i].yy;
         if(fwrite(&d.m22, 1, sizeof(d.m22), out) < sizeof(d.m22)) {
-            fprintf(stderr, "Writing matrix2x2 failed.\n");
+            LOG("Writing matrix2x2 failed.\n");
             goto error;
         }
     }
@@ -3405,7 +3675,7 @@ void save_file() {
         d.m32.yy = (*m32)[i].yy;
         d.m32.yz = (*m32)[i].yz;
         if(fwrite(&d.m32, 1, sizeof(d.m32), out) < sizeof(d.m32)) {
-            fprintf(stderr, "Writing matrix3x2 failed.\n");
+            LOG("Writing matrix3x2 failed.\n");
             goto error;
         }
     }
@@ -3416,7 +3686,7 @@ void save_file() {
         d.w.bias = (*w)[i].bias;
         d.w.transform = (*w)[i].transform;
         if(fwrite(&d.w, 1, sizeof(d.w), out) < sizeof(d.w)) {
-            fprintf(stderr, "Writing wall failed.\n");
+            LOG("Writing wall failed.\n");
             goto error;
         }
     }
@@ -3426,7 +3696,7 @@ void save_file() {
         d.l.wall[CEILING] = (*l)[i].wall[CEILING];
         d.l.wall[FLOOR] = (*l)[i].wall[FLOOR];
         if(fwrite(&d.l, 1, sizeof(d.l), out) < sizeof(d.l)) {
-            fprintf(stderr, "Writing line failed.\n");
+            LOG("Writing line failed.\n");
             goto error;
         }
     }
@@ -3437,7 +3707,7 @@ void save_file() {
         d.f.bias = (*f)[i].bias;
         d.f.transform = (*f)[i].transform;
         if(fwrite(&d.f, 1, sizeof(d.f), out) < sizeof(d.f)) {
-            fprintf(stderr, "Writing flat failed.\n");
+            LOG("Writing flat failed.\n");
             goto error;
         }
     }
@@ -3451,27 +3721,22 @@ void save_file() {
         d.s.lines = (*s)[i].lines - 3; /* 3 lines minimum so 0 is 3 mines */
         d.s.action = (*s)[i].action;
         if(fwrite(&d.s, 1, sizeof(d.s), out) < sizeof(d.s)) {
-            fprintf(stderr, "Writing sector failed.\n");
+            LOG("Writing sector failed.\n");
             goto error;
         }
     }
 
     if(fwrite(li, 1, sizeof(Link_data) * h.links, out) < sizeof(Link_data) * h.links) {
-        fprintf(stderr, "Writing links failed.\n");
+        LOG("Writing links failed.\n");
         goto error;
     }
 
-    d.v.start = v.start;
-    d.v.pos = viewpoint;
-    d.v.angle = v.angle;
-    d.v.startheight = v.startheight;
-    d.v.fov = v.fov;
-    if(fwrite(&d.v, 1, sizeof(d.v), out) < sizeof(d.v)) {
-        fprintf(stderr, "Writing view failed.\n");
+    if(fwrite(vs, 1, sizeof(View_data) * h.views, out) < sizeof(View_data) * h.views) {
+        LOG("Writing views failed.\n");
         goto error;
     }
 
-    fprintf(stderr, "File %s saved.\n", name);
+    LOG("File %s saved.\n", name);
 
 error:
     if(viewpoint >= 0) {
