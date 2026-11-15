@@ -94,6 +94,16 @@ typedef struct Sector_s {
     unsigned int action;
 } Sector;
 
+/* not so nice to be here because it's kinda private API but it doesn't mattter */
+typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
+    unsigned short start;
+    unsigned short pos;
+    float angle;
+    float startheight;
+
+    float fov;
+} View_data;
+
 typedef struct {
     unsigned short start;
     Point pos;
@@ -147,6 +157,9 @@ int set_action_waypoint(int sindex, float x, float y);
 int add_waypoint(int sindex, float x, float y);
 int delete_waypoint(int sindex, int index);
 
+int add_view(float x, float y, float angle, float startheight, float fov);
+int delete_view(int index);
+
 /* these shouldn't need to be accessible outside of editor mode */
 extern Header h;
 extern Point (*p)[];
@@ -156,6 +169,7 @@ extern Wall (*w)[];
 extern Line (*l)[];
 extern Flat (*f)[];
 extern Sector (*s)[];
+extern View_data (*vs)[];
 
 int split_line(int sindex, int lindex);
 int join_lines(int sindex, int pindex);

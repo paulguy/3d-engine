@@ -158,15 +158,6 @@ typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
     unsigned short lline;
 } Link_data;
 
-typedef struct __attribute__((packed)) __attribute__((aligned(1))) {
-    unsigned short start;
-    unsigned short pos;
-    float angle;
-    float startheight;
-
-    float fov;
-} View_data;
-
 typedef union {
     Point_data p;
     Matrix2x2_data m22;
@@ -3426,6 +3417,7 @@ int delete_waypoint(int sindex, int index) {
     Sector *sector = &(*s)[sindex];
     unsigned short firstpoint;
     unsigned int count;
+
     decode_waypoint(sector->action,
                     &firstpoint,
                     &count);
@@ -3448,6 +3440,72 @@ int delete_waypoint(int sindex, int index) {
     return(0);
 }
 
+int add_view(float x, float y, float angle, float startheight, float fov) {
+    int sindex;
+    View_data (*new_vs)[];
+    View_data *view;
+    int view_pos;
+
+    sindex = find_sector_point(x, y);
+    if(sindex < 0) {
+        LOG("No sector found for (%f, %f)\n", x, y);
+        return(-1);
+    }
+
+    new_vs = realloc(vs, sizeof(View_data) * (h.views + 1));
+    if(new_vs == NULL) {
+        LOG("realloc() failed\n");
+        return(-1);
+    }
+    vs = new_vs;
+
+    view_pos = add_point(x, y);
+    if(view_pos < 0) {
+        return(-1);
+    }
+
+    view = &(*vs)[h.views];
+    view->start = sindex;
+    view->pos = view_pos;
+    view->angle = angle;
+    view->startheight = startheight;
+    view->fov = fov;
+
+    h.views++;
+
+    return(0);
+}
+
+int delete_view(int index) {
+    View_data (*new_vs)[];
+    View_data *view;
+
+    if(index < 0 || index >= h.views) {
+        LOG("Index %d is out of range.\n", index);
+        return(-1);
+    }
+    view = &(*vs)[index];
+
+    if(deref_point(view->pos) < 0) {
+        return(-1);
+    }
+
+    if(index < h.views - 1) {
+        memmove(&(*vs)[index], &(*vs)[index + 1], sizeof(View_data) * (h.views - (index + 1)));
+    }
+
+    new_vs = realloc(vs, sizeof(View_data) * (h.views - 1));
+    if(new_vs == NULL) {
+        LOG("realloc() failed\n");
+        return(-1);
+    }
+    vs = new_vs;
+
+    h.views--;
+
+    return(0);
+}
+
 int init_map() {
     /* set up a square room with no textures and the view in the middle, and initialize point refs */
     int firstpoint;
@@ -3457,9 +3515,6 @@ int init_map() {
     int north_wall, south_wall, west_wall, east_wall;
     int flat_1x;
     int top_flat, bottom_flat;
-    /*
-    int view_pos;
-    */
 
     h.points = 0;
     h.matrix2x2s = 0;
@@ -3556,21 +3611,11 @@ int init_map() {
         return(-1);
     }
 
-    /*
-    view_pos = add_point(0.0, 0.0);
-    if(view_pos < 0) {
+    if(add_view(0.0, 0.0, 0.0, 32.0, FOV) < 0) {
         return(-1);
     }
-    */
-    /* TODO add view_data management functions and actually add initial view */
 
-    v.pos.x = 0.0;
-    v.pos.y = 0.0;
-    v.angle = 0.0;
-    v.startheight = 32.0;
-    v.height = 32.0;
-    v.start = 0;
-    v.fov = FOV; 
+    apply_view_data(&(*vs)[0]);
 
     return(0);
 }

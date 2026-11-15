@@ -57,6 +57,57 @@ extern unsigned char mapnum;
 #define FRAME_WAIT (20)
 #define MOUSE_SENSITIVITY (0.4)
 
+char *find_non_space(char *str) {
+    int i;
+
+    for(i = 0; str[i] == ' '; i++);
+
+    return(&str[i]);
+}
+
+#define EAT_SPACES(ERROR_LABEL) \
+    if(*wordend == '\0') { \
+        goto ERROR_LABEL; \
+    } \
+    word = find_non_space(wordend);
+
+#define GET_WORD(ERROR_LABEL) \
+    if(*word == '\0') { \
+        goto ERROR_LABEL; \
+    } \
+    wordend = strchr(word, ' '); \
+    if(wordend == NULL) { \
+        wordend = strchr(word, '\0'); \
+    }
+
+#define GET_LONG(VAR, ERROR_LABEL) \
+    if(*word == '\0') { \
+        goto ERROR_LABEL; \
+    } \
+    VAR = strtol(word, &wordend, 10); \
+    if(wordend == word) { \
+        goto ERROR_LABEL; \
+    }
+
+#define GET_FLOAT(VAR, ERROR_LABEL) \
+    if(*word == '\0') { \
+        goto ERROR_LABEL; \
+    } \
+    VAR = strtof(word, &wordend); \
+    if(wordend == word) { \
+        goto ERROR_LABEL; \
+    }
+
+int word_is(char *word, char *wordend, char *compare) {
+    int len = strlen(compare);
+
+    if(wordend - word != len) {
+        return(0);
+    }
+
+    return(memcmp(word, compare, len) == 0);
+}
+
 typedef enum {
     SEL_POINT = 0,
     SEL_LINE,
@@ -248,28 +299,25 @@ point_cb_t point_cb;
 
 float prompt_x;
 
-void prompt_point_y_cb(char *str) {
-    char *endptr;
+void prompt_point_y_cb(char *word) {
+    char *wordend;
     float prompt_y;
 
-    prompt_y = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_y, error)
 
     point_cb(prompt_x, prompt_y);
+    /* makes the generic GET_FLOAT be the same as GET_LONG... */
+error:
 }
 
-void prompt_point_x_cb(char *str) {
-    char *endptr;
+void prompt_point_x_cb(char *word) {
+    char *wordend;
 
-    prompt_x = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_x, error)
 
     fprintf(stderr, "Point Y: ");
     start_prompt(prompt_point_y_cb);
+error:
 }
 
 void prompt_point(point_cb_t callback) {
@@ -286,52 +334,44 @@ matrix2x2_cb_t matrix2x2_cb;
 float prompt_xx, prompt_xy, prompt_xz,
       prompt_yx, prompt_yy;
 
-void prompt_matrix2x2_yy_cb(char *str) {
-    char *endptr;
+void prompt_matrix2x2_yy_cb(char *word) {
+    char *wordend;
 
-    prompt_yy = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_yy, error)
 
     matrix2x2_cb(prompt_xx, prompt_xy,
                  prompt_yx, prompt_yy);
+error:
 }
 
-void prompt_matrix2x2_yx_cb(char *str) {
-    char *endptr;
+void prompt_matrix2x2_yx_cb(char *word) {
+    char *wordend;
 
-    prompt_yx = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_yx, error)
 
     fprintf(stderr, "Matrix2x2 YY: ");
     start_prompt(prompt_matrix2x2_yy_cb);
+error:
 }
 
-void prompt_matrix2x2_xy_cb(char *str) {
-    char *endptr;
+void prompt_matrix2x2_xy_cb(char *word) {
+    char *wordend;
 
-    prompt_xy = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_xy, error)
 
     fprintf(stderr, "Matrix2x2 YX: ");
     start_prompt(prompt_matrix2x2_yx_cb);
+error:
 }
 
-void prompt_matrix2x2_xx_cb(char *str) {
-    char *endptr;
+void prompt_matrix2x2_xx_cb(char *word) {
+    char *wordend;
 
-    prompt_xx = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_xx, error)
 
     fprintf(stderr, "Matrix2x2 XY: ");
     start_prompt(prompt_matrix2x2_xy_cb);
+error:
 }
 
 void prompt_matrix2x2(matrix2x2_cb_t callback) {
@@ -345,77 +385,65 @@ typedef void (* matrix3x2_cb_t)(float xx, float xy, float xz,
 
 matrix3x2_cb_t matrix3x2_cb;
 
-void prompt_matrix3x2_yz_cb(char *str) {
-    char *endptr;
+void prompt_matrix3x2_yz_cb(char *word) {
+    char *wordend;
     float prompt_yz;
 
-    prompt_yz = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_yz, error)
 
     matrix3x2_cb(prompt_xx, prompt_xy, prompt_xz,
                  prompt_yx, prompt_yy, prompt_yz);
+error:
 }
 
-void prompt_matrix3x2_yy_cb(char *str) {
-    char *endptr;
+void prompt_matrix3x2_yy_cb(char *word) {
+    char *wordend;
 
-    prompt_yy = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_yy, error)
 
     fprintf(stderr, "Matrix3x2 YZ: ");
     start_prompt(prompt_matrix3x2_yz_cb);
+error:
 }
 
-void prompt_matrix3x2_yx_cb(char *str) {
-    char *endptr;
+void prompt_matrix3x2_yx_cb(char *word) {
+    char *wordend;
 
-    prompt_yx = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_yx, error)
 
     fprintf(stderr, "Matrix3x2 YY: ");
     start_prompt(prompt_matrix3x2_yy_cb);
+error:
 }
 
-void prompt_matrix3x2_xz_cb(char *str) {
-    char *endptr;
+void prompt_matrix3x2_xz_cb(char *word) {
+    char *wordend;
 
-    prompt_xz = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_xz, error)
 
     fprintf(stderr, "Matrix3x2 YX: ");
     start_prompt(prompt_matrix3x2_yx_cb);
+error:
 }
 
-void prompt_matrix3x2_xy_cb(char *str) {
-    char *endptr;
+void prompt_matrix3x2_xy_cb(char *word) {
+    char *wordend;
 
-    prompt_xy = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_xy, error)
 
     fprintf(stderr, "Matrix3x2 XZ: ");
     start_prompt(prompt_matrix3x2_xz_cb);
+error:
 }
 
-void prompt_matrix3x2_xx_cb(char *str) {
-    char *endptr;
+void prompt_matrix3x2_xx_cb(char *word) {
+    char *wordend;
 
-    prompt_xx = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(prompt_xx, error)
 
     fprintf(stderr, "Matrix3x2 XY: ");
     start_prompt(prompt_matrix3x2_xy_cb);
+error:
 }
 
 void prompt_matrix3x2(matrix3x2_cb_t callback) {
@@ -443,65 +471,58 @@ void move_point_cb(float x, float y) {
 
 int action_which;
 
-void prompt_line_texture_cb(char *str) {
-    char *endptr;
+void prompt_line_texture_cb(char *word) {
+    char *wordend;
     int texture;
 
-    texture = strtol(str, &endptr, 10);
-    if(endptr == str) {
-        return;
-    }
+    GET_LONG(texture, error)
 
     if(set_line_texture(s_line, action_which,
                         texture) < 0) {
         fprintf(stderr, "Set line texture failed.\n");
     }
+error:
 }
 
-void prompt_sector_texture_cb(char *str) {
-    char *endptr;
+void prompt_sector_texture_cb(char *word) {
+    char *wordend;
     int texture;
 
-    texture = strtol(str, &endptr, 10);
-    if(endptr == str) {
-        return;
-    }
+    GET_LONG(texture, error)
 
     if(set_sector_texture(s_sector, action_which,
-                        texture) < 0) {
+                          texture) < 0) {
         fprintf(stderr, "Set sector texture failed.\n");
     }
+error:
 }
 
-int parse_shade(const char *str, int *shade) {
+int parse_shade(const char *word, int *shade) {
+    char *wordend;
     int color;
     *shade = 0;
 
-    char *endptr;
-    const char *num = str;
-
-    if(num[0] == '\n') {
+    if(word[0] == '\n') {
         return(-1);
-    } else if(num[0] == 'p' || num[0] == 'P') {
+    } else if(word[0] == 'p' || word[0] == 'P') {
         *shade |= SHADE_PARALLAX;
-        num = &num[1];
+        word = &word[1];
     }
 
-    if(num[0] == '\n') {
+    if(word[0] == '\n') {
         return(-1);
-    } else if(num[0] == '-') {
+    } else if(word[0] == '-') {
         *shade |= SHADE_SUB;
-        num = &num[1];
+        word = &word[1];
     }
 
     /* shades are 0-3, so base 4 */
-    color = strtol(num, &endptr, 4);
-    if(endptr == num) {
-        return(-1);
-    }
+    GET_LONG(color, error)
     *shade |= (color & 0x03) | ((color & 0x0C) << 1) | ((color & 0x30) << 2);
 
     return(0);
+error:
+    return(-1);
 }
 
 void prompt_line_shade_cb(char *str) {
@@ -530,16 +551,14 @@ void prompt_sector_shade_cb(char *str) {
     }
 }
 
-void prompt_sector_height_cb(char *str) {
-    char *endptr;
+void prompt_sector_height_cb(char *word) {
+    char *wordend;
     float height;
 
-    height = strtof(str, &endptr);
-    if(endptr == str) {
-        return;
-    }
+    GET_FLOAT(height, error)
 
     (*s)[s_sector].height[action_which] = height;
+error:
 }
 
 void set_line_bias_cb(float x, float y) {
@@ -573,9 +592,9 @@ void set_sector_transform_cb(float xx, float xy,
 }
 
 void prompt_mapnum_cb(char *str) {
-    char *endptr;
+    char *wordend;
 
-    mapnum = strtol(str, &endptr, 10);
+    mapnum = strtol(str, &wordend, 10);
     fprintf(stderr, "Mapnum set to %hhu.\n", mapnum);
 }
 
@@ -718,40 +737,7 @@ void print_action(unsigned int action) {
     }
 }
 
-char *find_non_space(char *str) {
-    int i;
-
-    for(i = 0; str[i] != ' ' || str[i] == '\0'; i++);
-
-    return(&str[i]);
-}
-
-int parse_point(char *str, float *x, float *y) {
-    char *word;
-    char *wordend;
-
-    word = find_non_space(str);
-    if(*word == '\0') {
-        return(-1);
-    }
-
-    *x = strtof(word, &wordend);
-    if(wordend == word || *wordend != ' ') {
-        return(-1);
-    }
-    word = find_non_space(wordend);
-    if(*word == '\0') {
-        return(-1);
-    }
-    *y = strtof(word, &wordend);
-    if(wordend == word) {
-        return(-1);
-    }
-
-    return(0);
-}
-
-void print_menu(int waypoints) {
+void print_action_menu(int list) {
     Sector *sector = &(*s)[s_sector];
     unsigned short firstpoint;
     unsigned int count;
@@ -761,7 +747,7 @@ void print_menu(int waypoints) {
     print_action(sector->action);
     fprintf(stderr, "\n");
 
-    if(waypoints) {
+    if(list) {
         if(GET_ACTION(sector->action) == ACTION_WAYPOINT) {
             fprintf(stderr, "Waypoints:\n");
             decode_waypoint(sector->action, &firstpoint, &count);
@@ -771,61 +757,35 @@ void print_menu(int waypoints) {
         }
     }
 
-    fprintf(stderr, "Enter selection: (none, warp <map> <view>, ");
+    fprintf(stderr, "Selections: none, warp <map> <view>, ");
     if(GET_ACTION(sector->action) == ACTION_WAYPOINT) {
         fprintf(stderr, "add <waypoint x> <waypoint y>, delete <waypoint index>, list");
     } else {
         fprintf(stderr, "waypoint <waypoint x>, <waypoint y>");
     }
-    fprintf(stderr, ", quit)\n");
+    fprintf(stderr, ", quit\n");
 }
 
-void prompt_action_menu_cb(char *str) {
+void prompt_action_menu_cb(char *word) {
     Sector *sector = &(*s)[s_sector];
-    char orig;
-    char *word;
-    char *wordend;
+    char *wordend = word;
 
-    word = str;
-    wordend = strchr(str, ' ');
-    if(wordend != NULL) {
-        orig = *wordend;
-        *wordend = '\0';
-    } else {
-        /* note to following code of end of string */
-        orig = '\0';
-    }
+    EAT_SPACES(error_word)
+    GET_WORD(error_word)
 
-    if(strcasecmp(word, "none") == 0) {
+    if(word_is(word, wordend, "none")) {
         if(set_action_none(s_sector) == 0) {
             fprintf(stderr, "Set sector %d action to none.\n", s_sector);
         }
         goto finish;
-    } else if(strcasecmp(word, "warp") == 0) {
+    } else if(word_is(word, wordend, "warp")) {
         long map;
         long view;
 
-        if(orig == '\0') {
-            goto error_warp;
-        }
-        *wordend = orig;
-        word = find_non_space(wordend);
-        if(*word == '\0') {
-            goto error_warp;
-        }
-
-        map = strtol(word, &wordend, 10);
-        if(wordend == word || *wordend != ' ') {
-            goto error_warp;
-        }
-        word = find_non_space(wordend);
-        if(*word == '\0') {
-            goto error_warp;
-        }
-        view = strtol(word, &wordend, 10);
-        if(wordend == word) {
-            goto error_warp;
-        }
+        EAT_SPACES(error_warp)
+        GET_LONG(map, error_warp)
+        EAT_SPACES(error_warp)
+        GET_LONG(view, error_warp)
 
         map &= 0xFF;
         view &= 0xFF;
@@ -833,60 +793,43 @@ void prompt_action_menu_cb(char *str) {
             fprintf(stderr, "Set sector %d action to warp to map %ld view %ld.\n", s_sector, map, view);
         }
         goto finish;
-    } else if(strcasecmp(word, "quit") == 0) {
+    } else if(word_is(word, wordend, "quit")) {
         return;
     } else {
         float x, y;
         long waypoint;
 
         if(GET_ACTION(sector->action) == ACTION_WAYPOINT) {
-            if(strcasecmp(word, "add") == 0 ||
-               strcasecmp(word, "waypoint") == 0) {
-                if(orig == '\0') {
-                    goto error_add;
-                }
-                *wordend = orig;
-                if(parse_point(wordend, &x, &y) < 0) {
-                    goto error_add;
-                }
+            if(word_is(word, wordend, "add") ||
+               word_is(word, wordend, "waypoint")) {
+                EAT_SPACES(error_add)
+                GET_FLOAT(x, error_add)
+                EAT_SPACES(error_add)
+                GET_FLOAT(y, error_add)
 
                 if(add_waypoint(s_sector, x, y) == 0) {
                     fprintf(stderr, "Added to sector %d waypoint at (%f, %f).\n", s_sector, x, y);
                 }
                 goto finish;
                 return;
-            } else if(strcasecmp(word, "delete") == 0) {
-                if(orig == '\0') {
-                    goto error_delete;
-                }
-                *wordend = orig;
-
-                word = find_non_space(wordend);
-                if(*word == '\0') {
-                    goto error_delete;
-                }
-                waypoint = strtol(word, &wordend, 10);
-                if(wordend == word) {
-                    goto error_delete;
-                }
+            } else if(word_is(word, wordend, "delete")) {
+                EAT_SPACES(error_delete)
+                GET_LONG(waypoint, error_delete)
 
                 if(delete_waypoint(s_sector, waypoint) == 0) {
                     fprintf(stderr, "Deleted waypoint %ld from sector %d.\n", waypoint, s_sector);
                 }
                 goto finish;
-            } else if(strcasecmp(word, "list") == 0) {
-                print_menu(1);
+            } else if(word_is(word, wordend, "list")) {
+                print_action_menu(1);
                 goto prompt_only;
             }
         } else {
-            if(strcasecmp(word, "waypoint") == 0) {
-                if(orig == '\0') {
-                    goto error_waypoint;
-                }
-                *wordend = orig;
-                if(parse_point(wordend, &x, &y) < 0) {
-                    goto error_waypoint;
-                }
+            if(word_is(word, wordend, "waypoint")) {
+                EAT_SPACES(error_waypoint)
+                GET_FLOAT(x, error_waypoint)
+                EAT_SPACES(error_waypoint)
+                GET_FLOAT(y, error_waypoint)
 
                 if(set_action_waypoint(s_sector, x, y) == 0) {
                     fprintf(stderr, "Set sector %d action to waypoint with first point at (%f, %f).\n", s_sector, x, y);
@@ -899,6 +842,9 @@ void prompt_action_menu_cb(char *str) {
     fprintf(stderr, "Unknown selection %s.\n", word);
     goto finish;
 
+error_word:
+    fprintf(stderr, "No action given.\n");
+    goto finish;
 error_add:
     fprintf(stderr, "add needs an X and Y.\n");
     goto finish;
@@ -911,7 +857,7 @@ error_warp:
 error_waypoint:
     fprintf(stderr, "waypoint needs an X and Y.\n");
 finish:
-    print_menu(0);
+    print_action_menu(0);
 prompt_only:
     fprintf(stderr, "\nSelection: ");
     start_prompt(prompt_action_menu_cb);
@@ -919,9 +865,98 @@ prompt_only:
 }
 
 void action_menu() {
-    print_menu(1);
+    print_action_menu(1);
     fprintf(stderr, "\nSelection: ");
     start_prompt(prompt_action_menu_cb);
+}
+
+void print_views_menu(int list) {
+    int i;
+    View_data *view;
+    Point *point;
+
+    if(list) {
+        for(i = 0; i < h.views; i++) {
+            view = &(*vs)[i];
+            point = &(*p)[view->pos];
+            fprintf(stderr, "%d: Start sector: %hu  Point: %hu (%f, %f)  Angle: %f  Start height: %f  FOV: %f\n",
+                    i, view->start, view->pos, point->x, point->y, view->angle, view->startheight, view->fov);
+        }
+    }
+
+    fprintf(stderr, "Selections: add, here, delete, list, quit\n");
+}
+
+void prompt_view_menu_cb(char *word) {
+    char *wordend = word;
+
+    EAT_SPACES(error_word)
+    GET_WORD(error_word)
+
+    if(word_is(word, wordend, "add")) {
+        float x, y;
+        float angle, startheight, fov;
+
+        EAT_SPACES(error_add)
+        GET_FLOAT(x, error_add)
+        EAT_SPACES(error_add)
+        GET_FLOAT(y, error_add)
+        EAT_SPACES(error_add)
+        GET_FLOAT(angle, error_add)
+        EAT_SPACES(error_add)
+        GET_FLOAT(startheight, error_add)
+        EAT_SPACES(error_add)
+        GET_FLOAT(fov, error_add)
+
+        if(add_view(x, y, angle / 360.0 * (M_PI * 2.0), startheight, fov / 360 * (M_PI * 2.0)) < 0) {
+            fprintf(stderr, "Failed to add view.\n");
+        }
+
+        goto finish;
+    } else if(word_is(word, wordend, "here")) {
+        if(add_view(v.pos.x, v.pos.y, v.angle, v.startheight, v.fov) < 0) {
+            fprintf(stderr, "Failed to add view.\n");
+        }
+
+        goto finish;
+    } else if(word_is(word, wordend, "delete")) {
+        long index;
+
+        EAT_SPACES(error_delete)
+        GET_LONG(index, error_delete)
+
+        if(delete_view(index) < 0) {
+            fprintf(stderr, "Failed to delete view %ld.\n", index);
+        }
+
+        goto finish;
+    } else if(word_is(word, wordend, "list")) {
+        print_views_menu(1);
+        goto prompt_only;
+    } else if(word_is(word, wordend, "quit")) {
+        return;
+    }
+
+error_word:
+    fprintf(stderr, "No action given.\n");
+    goto finish;
+error_add:
+    fprintf(stderr, "add needs a position X and Y, an angle in degrees, a start height and a FOV in degrees.\n");
+    goto finish;
+error_delete:
+    fprintf(stderr, "delete needs a view index.\n");
+finish:
+    print_views_menu(0);
+prompt_only:
+    fprintf(stderr, "\nSelection: ");
+    start_prompt(prompt_view_menu_cb);
+    return;
+}
+
+void views_menu() {
+    print_views_menu(1);
+    fprintf(stderr, "\nSelection: ");
+    start_prompt(prompt_view_menu_cb);
 }
 
 int main(int argc, char **argv) {
@@ -934,9 +969,9 @@ int main(int argc, char **argv) {
     int turning = 0;
     int move = 0;
     int strafe = 0;
+    int elevate = 0;
     int drag_move = 0;
     int drag_turn = 0;
-    int action = 0;
     Point total_move;
     float total_turn;
     SDL_Event event;
@@ -1096,6 +1131,21 @@ int main(int argc, char **argv) {
                         case SDLK_D:
                             strafe = 1;
                             break;
+                        case SDLK_MINUS:
+                            if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
+                                v.fov -= M_PI * 2.0 / 360.0;
+                            } else {
+                                elevate = -1;
+                            }
+                            break;
+                        case SDLK_EQUALS:
+                        case SDLK_PLUS:
+                            if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
+                                v.fov += M_PI * 2.0 / 360.0;
+                            } else {
+                                elevate = 1;
+                            }
+                            break;
                         case SDLK_Q:
                             running = 0;
                             break;
@@ -1136,6 +1186,11 @@ int main(int argc, char **argv) {
                         } else if(strafe < 0) {
                             strafe = -10;
                         }
+                        if(elevate > 0) {
+                            elevate = 10;
+                        } else if(elevate < 0) {
+                            elevate = -10;
+                        }
                     }
                     break;
                 case SDL_EVENT_KEY_UP:
@@ -1151,6 +1206,11 @@ int main(int argc, char **argv) {
                         case SDLK_A:
                         case SDLK_D:
                             strafe = 0;
+                            break;
+                        case SDLK_MINUS:
+                        case SDLK_EQUALS:
+                        case SDLK_PLUS:
+                            elevate = 0;
                             break;
                         default:
                             continue;
@@ -1363,6 +1423,11 @@ int main(int argc, char **argv) {
                                     action_menu();
                                 }
                                 break;
+                            case SDLK_V:
+                                if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
+                                    views_menu();
+                                }
+                                break;
                             case SDLK_TAB:
                                 target = NEXT_TARGET[target];
                                 fprintf(stderr, "Selection target: %s\n", SELECTION_TARGET[target]);
@@ -1437,7 +1502,12 @@ int main(int argc, char **argv) {
         if(total_move.x != 0.0 || total_move.y != 0.0) {
             engine_move(sin(v.angle) * total_move.y + sin(v.angle + M_PI / 2.0) * total_move.x,
                         cos(v.angle) * total_move.y + cos(v.angle + M_PI / 2.0) * total_move.x,
-                        action);
+                        0);
+        }
+
+        if(elevate) {
+            v.height += elevate;
+            v.startheight += elevate;
         }
     }
 
