@@ -882,7 +882,7 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
                     bias.x += bg_pan * ceiling_dim;
                 }
                 for(y = top; y < h_2 && y < bottom; y++) {
-                    z = ceilingdiff / ((h_2 - y) / h_2) * max_offset;
+                    z = ceilingdiff / (h_2 - y) * h_2 / max_offset;
 
                     if(z > total_distance) {
                         break;
@@ -964,7 +964,7 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
                     bias.x += bg_pan * floor_dim;
                 }
                 for(y = bottom; y >= 0 && y >= top; y--) {
-                    z = floordiff / ((h_2 - y) / h_2) * max_offset;
+                    z = floordiff / (h_2 - y) * h_2 / max_offset;
 
                     if(z >= total_distance) {
                         break;
@@ -1064,7 +1064,7 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
                             wy = (float)y / height * top_line_dim;
                         } else {
                             /* calculate height */
-                            wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
+                            wz = (y - h_2) / h_2 * max_offset * total_distance - v.height;
                         }
 
                         /* calculate translated texcoords */
@@ -1126,7 +1126,7 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
             sector = &(*s)[line->sector];
 
             ceilingdiff = sector->height[CEILING] - v.height;
-            next_y = h_2 - (ceilingdiff / total_distance * max_offset * h_2);
+            next_y = h_2 - (ceilingdiff / total_distance / max_offset * h_2);
             if(next_y > top) {
                 /* draw top wall */
                 /* wx and wy should already be set */
@@ -1139,7 +1139,7 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
                         if(shade & SHADE_PARALLAX) {
                             wy = (float)y / height * top_line_dim;
                         } else {
-                            wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
+                            wz = (y - h_2) / h_2 * max_offset * total_distance - v.height;
                         }
 
                         tx = (wx * transform32->xx) +
@@ -1195,7 +1195,7 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
 
             /* draw bottom wall */
             floordiff = sector->height[FLOOR] - v.height;
-            next_y = h_2 - (floordiff / total_distance * max_offset * h_2);
+            next_y = h_2 - (floordiff / total_distance / max_offset * h_2);
             if(next_y < bottom) {
                 /* bottom wall texture will be needed */
                 if((*w)[line->wall[FLOOR]].texture != bottom_line_tex) {
@@ -1226,7 +1226,7 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
                         if(shade & SHADE_PARALLAX) {
                             wy = (float)y / height * top_line_dim;
                         } else {
-                            wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
+                            wz = (y - h_2) / h_2 * max_offset * total_distance - v.height;
                         }
 
                         tx = (wx * transform32->xx) +
@@ -1527,7 +1527,7 @@ int get_hit(int mx, int my,
             /* ceiling is above the view line */
 
             for(y = top; y < h_2 && y < bottom; y++) {
-                z = ceilingdiff / ((h_2 - y) / h_2) * max_offset;
+                z = ceilingdiff / (h_2 - y) * h_2 / max_offset;
 
                 if(z > total_distance) {
                     break;
@@ -1546,7 +1546,7 @@ int get_hit(int mx, int my,
         floordiff = sector->height[FLOOR] - v.height;
         if(floordiff < 0.0) {
             for(y = bottom; y >= 0 && y >= top; y--) {
-                z = floordiff / ((h_2 - y) / h_2) * max_offset;
+                z = floordiff / (h_2 - y) * h_2 / max_offset;
 
                 if(z >= total_distance) {
                     break;
@@ -1569,7 +1569,7 @@ int get_hit(int mx, int my,
             for(y = top;
                 y <= bottom && y < height;
                 y++) {
-                *wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
+                *wz = (y - h_2) / h_2 * max_offset * total_distance - v.height;
                 if(y == my) {
                     return(0);
                 }
@@ -1582,14 +1582,14 @@ int get_hit(int mx, int my,
         sector = &(*s)[line->sector];
 
         ceilingdiff = sector->height[CEILING] - v.height;
-        next_y = h_2 - (ceilingdiff / total_distance * max_offset * h_2);
+        next_y = h_2 - (ceilingdiff / total_distance / max_offset * h_2);
         if(next_y > top) {
             /* draw top wall */
             /* wx and wy should already be set */
             for(y = top;
                 y <= next_y && y < height;
                 y++) {
-                *wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
+                *wz = (y - h_2) / h_2 * max_offset * total_distance - v.height;
                 if(y == my) {
                     return(0);
                 }
@@ -1599,7 +1599,7 @@ int get_hit(int mx, int my,
 
         /* draw bottom wall */
         floordiff = sector->height[FLOOR] - v.height;
-        next_y = h_2 - (floordiff / total_distance * max_offset * h_2);
+        next_y = h_2 - (floordiff / total_distance / max_offset * h_2);
         if(next_y < bottom) {
             /* bottom wall texture will be needed */
             *wx = v.pos.x + (slope.x * total_distance);
@@ -1608,7 +1608,7 @@ int get_hit(int mx, int my,
             for(y = bottom;
                 y >= next_y && y >= 0;
                 y--) {
-                *wz = ((y - h_2) / h_2) / max_offset * total_distance - v.height;
+                *wz = (y - h_2) / h_2 * max_offset * total_distance - v.height;
                 if(y == my) {
                     return(0);
                 }
