@@ -68,6 +68,7 @@ const unsigned char MAP_IDS[] = {
 
 #define STORAGE_ID_MAPNUM (0)
 #define STORAGE_ID_VIEW (1)
+#define STORAGE_ID_WAYPOINT (2)
 
 int open_map(unsigned char number) {
     if(number > MAX_MAP_ID) {
@@ -284,6 +285,7 @@ static void text_layer_update(struct Layer *layer, GContext *ctx) {
     layer_mark_dirty(s_engine_layer);
 }
 
+#ifndef WATCHFACE
 void select_click_handler(ClickRecognizerRef recognizer, void *context) {
     engine_move(sin(v.angle) * 10.0, cos(v.angle) * 10.0, 1);
     layer_mark_dirty(s_engine_layer);
@@ -304,13 +306,16 @@ void config_provider(Window *window) {
     window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 30, down_click_handler);
     window_single_repeating_click_subscribe(BUTTON_ID_SELECT, 30, select_click_handler);
 }
+#endif
 
 static void prv_window_load(Window *window) {
     window_set_background_color(window, GColorBlack);
     Layer *window_layer = window_get_root_layer(window);
     GRect bounds = layer_get_bounds(window_layer);
 
+#ifndef WATCHFACE
     window_set_click_config_provider(window, (ClickConfigProvider) config_provider);
+#endif
 
     s_text_layer = layer_create(GRect(0, bounds.size.h - 26, bounds.size.w, 26));
     layer_set_update_proc(s_text_layer, text_layer_update);
@@ -329,6 +334,9 @@ static void prv_window_unload(Window *window) {
 }
 
 void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+#ifdef WATCHFACE
+    engine_step_waypoint();
+#endif
     /* signal to redraw the layers, engine view will be marked dirty after time is updated */
     layer_mark_dirty(s_text_layer);
 }
@@ -364,6 +372,9 @@ static void prv_init(void) {
         if(persist_exists(STORAGE_ID_VIEW) &&
            persist_get_size(STORAGE_ID_VIEW) == sizeof(View)) {
             persist_read_data(STORAGE_ID_VIEW, &v, sizeof(View));
+            if(persist_exists(STORAGE_ID_WAYPOINT)) {
+                waypoint = persist_read_int(STORAGE_ID_WAYPOINT);
+            }
         }
     } else {
         /* initial map and view */
@@ -376,6 +387,7 @@ static void prv_init(void) {
 static void prv_deinit(void) {
     persist_write_int(STORAGE_ID_MAPNUM, mapnum);
     persist_write_data(STORAGE_ID_VIEW, &v, sizeof(View));
+    persist_write_int(STORAGE_ID_WAYPOINT, waypoint);
     window_destroy(s_window);
 }
 
