@@ -114,6 +114,9 @@ typedef struct {
     float fov;
 } View;
 
+extern unsigned char mapnum;
+extern int waypoint;
+
 typedef int (* map_exists_t)(unsigned char number);
 typedef int (* open_map_t)(unsigned char number);
 typedef int (* read_map_t)(off_t offset, size_t length, void *data);
@@ -131,8 +134,10 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
                    , int sel_point, int sel_line, int sel_sector
 #endif
         );
+void engine_turn(float angle);
 void engine_move(float x, float y,
                  int action);
+void engine_step_waypoint(int action);
 
 #ifdef EDITOR
 void print_data(Header *h);
@@ -156,9 +161,11 @@ int set_action_warp(int sindex, unsigned char map, unsigned char view);
 int set_action_waypoint(int sindex, float x, float y);
 int add_waypoint(int sindex, float x, float y);
 int delete_waypoint(int sindex, int index);
+int set_waypoint(int sindex, int index);
 
 int add_view(float x, float y, float angle, float startheight, float fov);
 int delete_view(int index);
+int set_view(int index);
 
 /* these shouldn't need to be accessible outside of editor mode */
 extern Header h;

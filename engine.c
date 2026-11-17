@@ -95,6 +95,8 @@
 #include "cache.h"
 
 #define FOV (60.0 / 360.0 * (M_PI * 2.0))
+#define TURN_SPEED (M_PI * 0.1)
+#define STEP_SPEED (10.0)
 
 #define HIGHLIGHT_DENSITY (4)
 #define HIGHLIGHT_LINE_THICKNESS (2.0)
@@ -172,7 +174,7 @@ typedef union {
 
 unsigned char mapnum;
 View v;
-Point waypoint;
+int waypoint = -1;
 Point (*p)[] = NULL;
 Matrix2x2 (*m22)[] = NULL;
 Matrix3x2 (*m32)[] = NULL;
@@ -317,6 +319,7 @@ int engine_load(unsigned char number, unsigned char view) {
 #endif
 
     if(p != NULL) {
+        waypoint = -1;
         free(s);
         free(f);
         free(l);
@@ -1328,6 +1331,13 @@ int do_action(Sector *sector) {
                 close_map_p();
             } else {
                 engine_load(map, view);
+
+                /* get new sector and perform its action while preventing recursive warps */
+                sector = &(*s)[v.start];
+                if(GET_ACTION(sector->action) != ACTION_WARP) {
+                    /* ignore return value because a new map was loaded */
+                    do_action(sector);
+                }
             }
             return(1);
         case ACTION_WAYPOINT:
@@ -1336,13 +1346,21 @@ int do_action(Sector *sector) {
             decode_waypoint(sector->action, &firstpoint, &count);
  
             /* pick a waypoint by random */
-            unsigned short selection = firstpoint + (rand() % count);
-            waypoint.x = (*p)[selection].x;
-            waypoint.y = (*p)[selection].y;
+            waypoint = firstpoint + (rand() % count);
             break;
     }
 
     return(0);
+}
+
+void engine_turn(float angle) {
+    v.angle += angle;
+
+    if(v.angle < -M_PI) {
+        v.angle += M_PI * 2.0;
+    } else if(v.angle >= M_PI) {
+        v.angle -= M_PI * 2.0;
+    }
 }
 
 void engine_move(float x, float y,
@@ -1435,6 +1453,45 @@ void engine_move(float x, float y,
     v.pos.y = dest.y;
     v.start = sindex;
     v.height = sector->height[FLOOR] + v.startheight;
+}
+
+void engine_step_waypoint(int action) {
+    Point *point;
+    Point slope;
+    float angle_to;
+    float angle;
+
+    if(waypoint >= 0) {
+        point = &(*p)[waypoint];
+
+        slope.x = point->x - v.pos.x;
+        slope.y = point->y - v.pos.y;
+
+        angle_to = atan2(slope.x, slope.y);
+
+        if(v.angle - angle_to > M_PI) {
+            /* nearest clockwise over wrap around */
+            angle = (M_PI - v.angle) + (angle_to + M_PI);
+        } else if(angle_to - v.angle > M_PI) {
+            /* nearest counter clockwise over wrap around */
+            angle = (M_PI - angle_to) + (v.angle + M_PI);
+        } else {
+            /* nearest along continuous angle */
+            angle = v.angle - angle_to;
+        }
+
+        if(fabs(angle) <= TURN_SPEED) {
+            v.angle = angle_to;
+        } else if(angle > 0.0) {
+            engine_turn(-TURN_SPEED);
+        } else if(angle < 0.0) {
+            engine_turn(TURN_SPEED);
+        }
+    }
+
+    engine_move(sin(v.angle) * STEP_SPEED,
+                cos(v.angle) * STEP_SPEED,
+                action);
 }
 
 #ifdef EDITOR
@@ -3440,6 +3497,24 @@ int delete_waypoint(int sindex, int index) {
     return(0);
 }
 
+int set_waypoint(int sindex, int index) {
+    Sector *sector = &(*s)[sindex];
+    unsigned short firstpoint;
+    unsigned int count;
+
+    decode_waypoint(sector->action,
+                    &firstpoint,
+                    &count);
+    if(index < 0 || index >= count) {
+        LOG("Index %d is out of range.\n", index);
+        return(-1);
+    }
+
+    waypoint = firstpoint + index;
+
+    return(0);
+}
+
 int add_view(float x, float y, float angle, float startheight, float fov) {
     int sindex;
     View_data (*new_vs)[];
@@ -3502,6 +3577,17 @@ int delete_view(int index) {
     vs = new_vs;
 
     h.views--;
+
+    return(0);
+}
+
+int set_view(int index) {
+    if(index < 0 || index >= h.views) {
+        LOG("Index %d is out of range.\n", index);
+        return(-1);
+    }
+
+    apply_view_data(&(*vs)[index]);
 
     return(0);
 }
@@ -3615,7 +3701,7 @@ int init_map() {
         return(-1);
     }
 
-    apply_view_data(&(*vs)[0]);
+    set_view(0);
 
     return(0);
 }

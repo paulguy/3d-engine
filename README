@@ -2,6 +2,7 @@ Editor Keys:
 LEFT/RIGHT - Turn left and right.
 A/D - Strafe left and right.
 W/S - Move forward and back.
+-/= - Lower or raise elevation.
 Q - Quit.
 Hold SHIFT - Speed up movement.
 Hold middle mouse button - Forward/back movement and strafing by mouse
@@ -52,6 +53,7 @@ R - like T but for transform (texture transformed based on world coordinates).
         Requires entering a new 2x2 matrix (world X, Y in to texture X, Y).
 CTRL+A - Sector mode:
            Manage sector action.
+CTRL+V - Manage views.
 I - Print information on any highlighted item in the current mode.
 TAB - Change target mode for actions between point, line and sector modes.
       Also affects which is highlighted for selection and cursor hover.

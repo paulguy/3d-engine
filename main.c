@@ -297,33 +297,24 @@ typedef void (* point_cb_t)(float x, float y);
 
 point_cb_t point_cb;
 
-float prompt_x;
+void prompt_point_cb(char *word) {
+    char *wordend = word;
+    float x, y;
 
-void prompt_point_y_cb(char *word) {
-    char *wordend;
-    float prompt_y;
+    EAT_SPACES(error)
+    GET_FLOAT(x, error)
+    EAT_SPACES(error)
+    GET_FLOAT(y, error)
 
-    GET_FLOAT(prompt_y, error)
-
-    point_cb(prompt_x, prompt_y);
+    point_cb(x, y);
     /* makes the generic GET_FLOAT be the same as GET_LONG... */
-error:
-}
-
-void prompt_point_x_cb(char *word) {
-    char *wordend;
-
-    GET_FLOAT(prompt_x, error)
-
-    fprintf(stderr, "Point Y: ");
-    start_prompt(prompt_point_y_cb);
 error:
 }
 
 void prompt_point(point_cb_t callback) {
     point_cb = callback;
-    fprintf(stderr, "Point X: ");
-    start_prompt(prompt_point_x_cb);
+    fprintf(stderr, "Point X Y: ");
+    start_prompt(prompt_point_cb);
 }
 
 typedef void (* matrix2x2_cb_t)(float xx, float xy,
@@ -331,53 +322,28 @@ typedef void (* matrix2x2_cb_t)(float xx, float xy,
 
 matrix2x2_cb_t matrix2x2_cb;
 
-float prompt_xx, prompt_xy, prompt_xz,
-      prompt_yx, prompt_yy;
+void prompt_matrix2x2_cb(char *word) {
+    char *wordend = word;
+    float xx, xy, yx, yy;
 
-void prompt_matrix2x2_yy_cb(char *word) {
-    char *wordend;
+    EAT_SPACES(error)
+    GET_FLOAT(xx, error)
+    EAT_SPACES(error)
+    GET_FLOAT(xy, error)
+    EAT_SPACES(error)
+    GET_FLOAT(yx, error)
+    EAT_SPACES(error)
+    GET_FLOAT(yy, error)
 
-    GET_FLOAT(prompt_yy, error)
-
-    matrix2x2_cb(prompt_xx, prompt_xy,
-                 prompt_yx, prompt_yy);
-error:
-}
-
-void prompt_matrix2x2_yx_cb(char *word) {
-    char *wordend;
-
-    GET_FLOAT(prompt_yx, error)
-
-    fprintf(stderr, "Matrix2x2 YY: ");
-    start_prompt(prompt_matrix2x2_yy_cb);
-error:
-}
-
-void prompt_matrix2x2_xy_cb(char *word) {
-    char *wordend;
-
-    GET_FLOAT(prompt_xy, error)
-
-    fprintf(stderr, "Matrix2x2 YX: ");
-    start_prompt(prompt_matrix2x2_yx_cb);
-error:
-}
-
-void prompt_matrix2x2_xx_cb(char *word) {
-    char *wordend;
-
-    GET_FLOAT(prompt_xx, error)
-
-    fprintf(stderr, "Matrix2x2 XY: ");
-    start_prompt(prompt_matrix2x2_xy_cb);
+    matrix2x2_cb(xx, xy,
+                 yx, yy);
 error:
 }
 
 void prompt_matrix2x2(matrix2x2_cb_t callback) {
     matrix2x2_cb = callback;
-    fprintf(stderr, "Matrix2x2 XX: ");
-    start_prompt(prompt_matrix2x2_xx_cb);
+    fprintf(stderr, "Matrix2x2 XX XY YX YY: ");
+    start_prompt(prompt_matrix2x2_cb);
 }
 
 typedef void (* matrix3x2_cb_t)(float xx, float xy, float xz,
@@ -385,71 +351,32 @@ typedef void (* matrix3x2_cb_t)(float xx, float xy, float xz,
 
 matrix3x2_cb_t matrix3x2_cb;
 
-void prompt_matrix3x2_yz_cb(char *word) {
-    char *wordend;
-    float prompt_yz;
+void prompt_matrix3x2_cb(char *word) {
+    char *wordend = word;
+    float xx, xy, xz, yx, yy, yz;
 
-    GET_FLOAT(prompt_yz, error)
+    EAT_SPACES(error)
+    GET_FLOAT(xx, error)
+    EAT_SPACES(error)
+    GET_FLOAT(xy, error)
+    EAT_SPACES(error)
+    GET_FLOAT(xz, error)
+    EAT_SPACES(error)
+    GET_FLOAT(yx, error)
+    EAT_SPACES(error)
+    GET_FLOAT(yy, error)
+    EAT_SPACES(error)
+    GET_FLOAT(yz, error)
 
-    matrix3x2_cb(prompt_xx, prompt_xy, prompt_xz,
-                 prompt_yx, prompt_yy, prompt_yz);
-error:
-}
-
-void prompt_matrix3x2_yy_cb(char *word) {
-    char *wordend;
-
-    GET_FLOAT(prompt_yy, error)
-
-    fprintf(stderr, "Matrix3x2 YZ: ");
-    start_prompt(prompt_matrix3x2_yz_cb);
-error:
-}
-
-void prompt_matrix3x2_yx_cb(char *word) {
-    char *wordend;
-
-    GET_FLOAT(prompt_yx, error)
-
-    fprintf(stderr, "Matrix3x2 YY: ");
-    start_prompt(prompt_matrix3x2_yy_cb);
-error:
-}
-
-void prompt_matrix3x2_xz_cb(char *word) {
-    char *wordend;
-
-    GET_FLOAT(prompt_xz, error)
-
-    fprintf(stderr, "Matrix3x2 YX: ");
-    start_prompt(prompt_matrix3x2_yx_cb);
-error:
-}
-
-void prompt_matrix3x2_xy_cb(char *word) {
-    char *wordend;
-
-    GET_FLOAT(prompt_xy, error)
-
-    fprintf(stderr, "Matrix3x2 XZ: ");
-    start_prompt(prompt_matrix3x2_xz_cb);
-error:
-}
-
-void prompt_matrix3x2_xx_cb(char *word) {
-    char *wordend;
-
-    GET_FLOAT(prompt_xx, error)
-
-    fprintf(stderr, "Matrix3x2 XY: ");
-    start_prompt(prompt_matrix3x2_xy_cb);
+    matrix3x2_cb(xx, xy, xz,
+                 yx, yy, yz);
 error:
 }
 
 void prompt_matrix3x2(matrix3x2_cb_t callback) {
     matrix3x2_cb = callback;
-    fprintf(stderr, "Matrix3x2 XX: ");
-    start_prompt(prompt_matrix3x2_xx_cb);
+    fprintf(stderr, "Matrix3x2 XX XY XZ YX YY YZ: ");
+    start_prompt(prompt_matrix3x2_cb);
 }
 
 void split_sector_cb(int sindex, int lindex, int pindex) {
@@ -472,9 +399,10 @@ void move_point_cb(float x, float y) {
 int action_which;
 
 void prompt_line_texture_cb(char *word) {
-    char *wordend;
+    char *wordend = word;
     int texture;
 
+    EAT_SPACES(error)
     GET_LONG(texture, error)
 
     if(set_line_texture(s_line, action_which,
@@ -485,9 +413,10 @@ error:
 }
 
 void prompt_sector_texture_cb(char *word) {
-    char *wordend;
+    char *wordend = word;
     int texture;
 
+    EAT_SPACES(error)
     GET_LONG(texture, error)
 
     if(set_sector_texture(s_sector, action_which,
@@ -497,10 +426,12 @@ void prompt_sector_texture_cb(char *word) {
 error:
 }
 
-int parse_shade(const char *word, int *shade) {
-    char *wordend;
+int parse_shade(char *word, int *shade) {
+    char *wordend = word;
     int color;
     *shade = 0;
+
+    EAT_SPACES(error)
 
     if(word[0] == '\n') {
         return(-1);
@@ -552,9 +483,10 @@ void prompt_sector_shade_cb(char *str) {
 }
 
 void prompt_sector_height_cb(char *word) {
-    char *wordend;
+    char *wordend = word;
     float height;
 
+    EAT_SPACES(error)
     GET_FLOAT(height, error)
 
     (*s)[s_sector].height[action_which] = height;
@@ -591,31 +523,35 @@ void set_sector_transform_cb(float xx, float xy,
     }
 }
 
-void prompt_mapnum_cb(char *str) {
-    char *wordend;
+void prompt_mapnum_cb(char *word) {
+    char *wordend = word;
 
-    mapnum = strtol(str, &wordend, 10);
+    EAT_SPACES(error)
+    GET_LONG(mapnum, error)
+
     fprintf(stderr, "Mapnum set to %hhu.\n", mapnum);
+    engine_load(mapnum, 0);
+error:
 }
 
 void print_view() {
     fprintf(stderr, "View is at %f, %f looking at %f ", v.pos.x, v.pos.y, v.angle);
-    if(v.angle > (M_PI / 16.0) && v.angle <= (M_PI / 16.0 * 3.0)) {
+    if(v.angle > (-M_PI / 8.0 * 7.0) && v.angle <= (-M_PI / 8.0 * 5.0)) {
+        fprintf(stderr, "(between -Y and -X)\n");
+    } else if(v.angle > (-M_PI / 8.0 * 5.0) && v.angle <= (-M_PI / 8.0 * 3.0)) {
+        fprintf(stderr, "(towards -X)\n");
+    } else if(v.angle > (-M_PI / 8.0 * 3.0) && v.angle <= (-M_PI / 8.0 * 1.0)) {
+        fprintf(stderr, "(between -X and +Y)\n");
+    } else if(v.angle > (-M_PI / 8.0 * 1.0) && v.angle <= (M_PI / 8.0 * 1.0)) {
+        fprintf(stderr, "(towards +Y)\n");
+    } else if(v.angle > (M_PI / 8.0 * 1.0) && v.angle <= (M_PI / 8.0 * 3.0)) {
         fprintf(stderr, "(between +Y and +X)\n");
     } else if(v.angle > (M_PI / 8.0 * 3.0) && v.angle <= (M_PI / 8.0 * 5.0)) {
         fprintf(stderr, "(towards +X)\n");
     } else if(v.angle > (M_PI / 8.0 * 5.0) && v.angle <= (M_PI / 8.0 * 7.0)) {
         fprintf(stderr, "(between +X and -Y)\n");
-    } else if(v.angle > (M_PI / 8.0 * 7.0) && v.angle <= (M_PI / 8.0 * 9.0)) {
-        fprintf(stderr, "(towards -Y)\n");
-    } else if(v.angle > (M_PI / 8.0 * 9.0) && v.angle <= (M_PI / 8.0 * 11.0)) {
-        fprintf(stderr, "(between -Y and -X)\n");
-    } else if(v.angle > (M_PI / 8.0 * 11.0) && v.angle <= (M_PI / 8.0 * 13.0)) {
-        fprintf(stderr, "(towards -X)\n");
-    } else if(v.angle > (M_PI / 8.0 * 13.0) && v.angle <= (M_PI / 8.0 * 15.0)) {
-        fprintf(stderr, "(between -X and +Y)\n");
     } else {
-        fprintf(stderr, "(towards +Y)\n");
+        fprintf(stderr, "(towards -Y)\n");
     }
 }
 
@@ -681,10 +617,14 @@ void print_sector(unsigned short sindex) {
             fprintf(stderr, "None\n");
             break;
         case ACTION_WARP:
-            fprintf(stderr, "Warp Map: %hhu View: %hhu\n", ((*s)[sindex].action & 0xFF00) >> 8, ((*s)[sindex].action & 0xFF0000) >> 16);
+            fprintf(stderr, "Warp Map: %hhu View: %hhu\n",
+                            ((*s)[sindex].action & 0xFF00) >> 8,
+                            ((*s)[sindex].action & 0xFF0000) >> 16);
             break;
         case ACTION_WAYPOINT:
-            fprintf(stderr, "Waypoint First Point: %hu Count: %hhu\n", ((*s)[sindex].action & 0xFFFF00) >> 8, ((*s)[sindex].action & 0xFF000000) >> 24);
+            fprintf(stderr, "Waypoint First Point: %hu Count: %hhu\n",
+                            ((*s)[sindex].action & 0xFFFF00) >> 8,
+                            (((*s)[sindex].action & 0xFF000000) >> 24) + 1);
             break;
         default:
             fprintf(stderr, "Unknown\n");
@@ -759,7 +699,7 @@ void print_action_menu(int list) {
 
     fprintf(stderr, "Selections: none, warp <map> <view>, ");
     if(GET_ACTION(sector->action) == ACTION_WAYPOINT) {
-        fprintf(stderr, "add <waypoint x> <waypoint y>, delete <waypoint index>, list");
+        fprintf(stderr, "add <waypoint x> <waypoint y>, here, delete <waypoint index>, set, list");
     } else {
         fprintf(stderr, "waypoint <waypoint x>, <waypoint y>");
     }
@@ -811,13 +751,25 @@ void prompt_action_menu_cb(char *word) {
                     fprintf(stderr, "Added to sector %d waypoint at (%f, %f).\n", s_sector, x, y);
                 }
                 goto finish;
-                return;
+            } else if(word_is(word, wordend, "here")) {
+                if(add_waypoint(s_sector, v.pos.x, v.pos.y) == 0) {
+                    fprintf(stderr, "Added to sector %d waypoint here at (%f, %f).\n", s_sector, v.pos.x, v.pos.y);
+                }
+                goto finish;
             } else if(word_is(word, wordend, "delete")) {
                 EAT_SPACES(error_delete)
                 GET_LONG(waypoint, error_delete)
 
                 if(delete_waypoint(s_sector, waypoint) == 0) {
                     fprintf(stderr, "Deleted waypoint %ld from sector %d.\n", waypoint, s_sector);
+                }
+                goto finish;
+            } else if(word_is(word, wordend, "set")) {
+                EAT_SPACES(error_set)
+                GET_LONG(waypoint, error_set)
+
+                if(set_waypoint(s_sector, waypoint) == 0) {
+                    fprintf(stderr, "Set current waypoint to %ld from sector %d.\n", waypoint, s_sector);
                 }
                 goto finish;
             } else if(word_is(word, wordend, "list")) {
@@ -835,6 +787,11 @@ void prompt_action_menu_cb(char *word) {
                     fprintf(stderr, "Set sector %d action to waypoint with first point at (%f, %f).\n", s_sector, x, y);
                 }
                 goto finish;
+             } else if(word_is(word, wordend, "here")) {
+                if(set_action_waypoint(s_sector, v.pos.x, v.pos.y) == 0) {
+                    fprintf(stderr, "Set sector %d action to waypoint with first point here at (%f, %f).\n", s_sector, v.pos.x, v.pos.y);
+                }
+                goto finish;
             }
         }
     }
@@ -850,6 +807,9 @@ error_add:
     goto finish;
 error_delete:
     fprintf(stderr, "delete needs a waypoint index.\n");
+    goto finish;
+error_set:
+    fprintf(stderr, "set needs a waypoint index.\n");
     goto finish;
 error_warp:
     fprintf(stderr, "warp needs a map and view.\n");
@@ -884,11 +844,12 @@ void print_views_menu(int list) {
         }
     }
 
-    fprintf(stderr, "Selections: add, here, delete, list, quit\n");
+    fprintf(stderr, "Selections: add, here, delete, set, list, quit\n");
 }
 
 void prompt_view_menu_cb(char *word) {
     char *wordend = word;
+    long index;
 
     EAT_SPACES(error_word)
     GET_WORD(error_word)
@@ -920,13 +881,20 @@ void prompt_view_menu_cb(char *word) {
 
         goto finish;
     } else if(word_is(word, wordend, "delete")) {
-        long index;
-
         EAT_SPACES(error_delete)
         GET_LONG(index, error_delete)
 
         if(delete_view(index) < 0) {
             fprintf(stderr, "Failed to delete view %ld.\n", index);
+        }
+
+        goto finish;
+    } else if(word_is(word, wordend, "set")) {
+        EAT_SPACES(error_set)
+        GET_LONG(index, error_set)
+
+        if(set_view(index) < 0) {
+            fprintf(stderr, "Failed to set view %ld.\n", index);
         }
 
         goto finish;
@@ -945,6 +913,9 @@ error_add:
     goto finish;
 error_delete:
     fprintf(stderr, "delete needs a view index.\n");
+    goto finish;
+error_set:
+    fprintf(stderr, "set needs a view index.\n");
 finish:
     print_views_menu(0);
 prompt_only:
@@ -958,6 +929,11 @@ void views_menu() {
     fprintf(stderr, "\nSelection: ");
     start_prompt(prompt_view_menu_cb);
 }
+
+/* TODO: function to set wall transform by wall angle
+ *       function to go to arbitrary sector
+ *       function to scan for objects with no references
+ */
 
 int main(int argc, char **argv) {
     SDL_Window *window;
@@ -1146,6 +1122,9 @@ int main(int argc, char **argv) {
                                 elevate = 1;
                             }
                             break;
+                        case SDLK_PERIOD:
+                            engine_step_waypoint(0);
+                            break;
                         case SDLK_Q:
                             running = 0;
                             break;
@@ -1172,6 +1151,9 @@ int main(int argc, char **argv) {
                                     print_sector(h_sector);
                                 }
                             }
+                            break;
+                        case SDLK_V:
+                            print_view();
                             break;
                     }
 
@@ -1411,6 +1393,7 @@ int main(int argc, char **argv) {
                                 }
                                 break;
                             case SDLK_N:
+                                fprintf(stderr, "Enter map number (This will try to load the map or clear the current map!):");
                                 start_prompt(prompt_mapnum_cb);
                                 break;
                             case SDLK_W:
@@ -1420,7 +1403,9 @@ int main(int argc, char **argv) {
                                 break;
                             case SDLK_A:
                                 if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
-                                    action_menu();
+                                    if(target == SEL_SECTOR) {
+                                        action_menu();
+                                    }
                                 }
                                 break;
                             case SDLK_V:
@@ -1493,10 +1478,7 @@ int main(int argc, char **argv) {
         }
 
         if(total_turn != 0.0) {
-            v.angle = fmodf(v.angle + total_turn, M_PI * 2.0);
-            if(v.angle < 0.0) {
-                v.angle += M_PI * 2.0;
-            }
+            engine_turn(total_turn);
         }
 
         if(total_move.x != 0.0 || total_move.y != 0.0) {
