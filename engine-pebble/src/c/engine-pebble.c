@@ -66,8 +66,8 @@ const unsigned char MAP_IDS[] = {
 };
 #define MAX_MAP_ID (sizeof(MAP_IDS) - 1)
 
-#define SMALL_TEX_RES_SIZE (SMALL_TEX_SIZE / 4 * 3)
-#define LARGE_TEX_RES_SIZE (LARGE_TEX_SIZE / 4 * 3)
+#define STORAGE_ID_MAPNUM (0)
+#define STORAGE_ID_VIEW (1)
 
 int open_map(unsigned char number) {
     if(number > MAX_MAP_ID) {
@@ -289,22 +289,13 @@ void select_click_handler(ClickRecognizerRef recognizer, void *context) {
     layer_mark_dirty(s_engine_layer);
 }
 
-float clamp_angle(float angle) {
-    if(angle < 0.0) {
-        angle += M_PI * 2.0;
-    } else if(angle >= M_PI * 2.0) {
-        angle -= M_PI * 2.0;
-    }
-    return angle;
-}
-
 void up_click_handler(ClickRecognizerRef recognizer, void *context) {
-    v.angle = clamp_angle(v.angle - (M_PI * 0.1));
+    engine_turn(M_PI * -0.1);
     layer_mark_dirty(s_engine_layer);
 }
 
 void down_click_handler(ClickRecognizerRef recognizer, void *context) {
-    v.angle = clamp_angle(v.angle + (M_PI * 0.1));
+    engine_turn(M_PI * 0.1);
     layer_mark_dirty(s_engine_layer);
 }
 
@@ -364,13 +355,27 @@ static void prv_init(void) {
     if(texmem == NULL) {
         APP_LOG(APP_LOG_LEVEL_DEBUG, "Failed to allocate texture memory, probably going to crash.\n", s_window);
     }
-    /* initial map and view */
-    engine_load(0, 0);
+
+    if(persist_exists(STORAGE_ID_MAPNUM)) {
+        int32_t num;
+
+        num = persist_read_int(STORAGE_ID_MAPNUM);
+        engine_load(num, 0);
+        if(persist_exists(STORAGE_ID_VIEW) &&
+           persist_get_size(STORAGE_ID_VIEW) == sizeof(View)) {
+            persist_read_data(STORAGE_ID_VIEW, &v, sizeof(View));
+        }
+    } else {
+        /* initial map and view */
+        engine_load(0, 0);
+    }
 
     tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 }
 
 static void prv_deinit(void) {
+    persist_write_int(STORAGE_ID_MAPNUM, mapnum);
+    persist_write_data(STORAGE_ID_VIEW, &v, sizeof(View));
     window_destroy(s_window);
 }
 
