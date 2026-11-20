@@ -2991,6 +2991,45 @@ void repoint_lines(int sindex, int lindex1, int lindex2, int new_sindex) {
     LOG("Following errors about sector lines may be errors.\n");
 }
 
+int fix_line_transform(int sindex, int lindex, int which) {
+    Point *p1, *p2;
+    Matrix3x2 *matrix3x2;
+    Wall *wall;
+    float slope;
+    int m32index;
+    int windex;
+    float x, y;
+    int temp;
+
+    p1 = &(*p)[(*l)[lindex].point];
+    p2 = &(*p)[(*l)[get_next_lindex(&(*s)[sindex], lindex)].point];
+    wall = &(*w)[(*l)[lindex].wall[which]];
+    matrix3x2 = &(*m32)[wall->transform];
+
+    slope = atan2(p2->x - p1->x, p2->y - p1->y);
+
+    /* avoid -0.0 ... */
+    x = sin(slope);
+    temp = x * 1000000;
+    x = temp / 1000000.0;
+    y = cos(slope);
+    temp = y * 1000000;
+    y = temp / 1000000.0;
+    m32index = add_matrix3x2(x, y, 0.0,
+                             matrix3x2->yx, matrix3x2->yy, matrix3x2->yz);
+    if(m32index < 0) {
+        return(-1);
+    }
+    windex = add_wall(wall->texture, wall->shade, wall->bias, m32index);
+    if(windex < 0) {
+        return(-1);
+    }
+
+    (*l)[lindex].wall[which] = windex;
+
+    return(0);
+}
+
 int delete_sector(int sindex) {
     Sector *sector = &(*s)[sindex];
     Sector (*new_s)[];

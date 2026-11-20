@@ -938,8 +938,7 @@ void views_menu() {
     start_prompt(prompt_view_menu_cb);
 }
 
-/* TODO: function to set wall transform by wall angle
- *       function to go to arbitrary sector
+/* TODO: unction to go to arbitrary sector
  *       function to scan for objects with no references
  */
 
@@ -1384,13 +1383,23 @@ int main(int argc, char **argv) {
                                 /* transform */
                                 action_which = cursor.y < surface->h / 2 ? CEILING : FLOOR;
                                 if(target == SEL_LINE) {
-                                    matrix3x2 = &(*m32)[(*w)[(*l)[s_line].wall[action_which]].transform];
-                                    fprintf(stderr, "Set %s line transform: Transform is [%f, %f, %f] [%f, %f, %f] .\n",
-                                                    FLAT_NAMES[action_which],
-                                                    matrix3x2->xx, matrix3x2->xy, matrix3x2->xz,
-                                                    matrix3x2->yx, matrix3x2->yy, matrix3x2->yz);
-                                    print_view();
-                                    prompt_matrix3x2(set_line_transform_cb);
+                                    if(((SDL_KeyboardEvent *)&event)->mod & SDL_KMOD_CTRL) {
+                                        if(fix_line_transform(s_sector, s_line, action_which) == 0) {
+                                            matrix3x2 = &(*m32)[(*w)[(*l)[s_line].wall[action_which]].transform];
+                                            fprintf(stderr, "Set %s line transform: Transform is [%f, %f, %f] [%f, %f, %f] .\n",
+                                                            FLAT_NAMES[action_which],
+                                                            matrix3x2->xx, matrix3x2->xy, matrix3x2->xz,
+                                                            matrix3x2->yx, matrix3x2->yy, matrix3x2->yz);
+                                        }
+                                    } else {
+                                        matrix3x2 = &(*m32)[(*w)[(*l)[s_line].wall[action_which]].transform];
+                                        fprintf(stderr, "Set %s line transform: Transform is [%f, %f, %f] [%f, %f, %f] .\n",
+                                                        FLAT_NAMES[action_which],
+                                                        matrix3x2->xx, matrix3x2->xy, matrix3x2->xz,
+                                                        matrix3x2->yx, matrix3x2->yy, matrix3x2->yz);
+                                        print_view();
+                                        prompt_matrix3x2(set_line_transform_cb);
+                                    }
                                 } else if(target == SEL_SECTOR) {
                                     matrix2x2 = &(*m22)[(*f)[(*s)[s_sector].flat[action_which]].transform];
                                     fprintf(stderr, "Set sector %s transform: Transform is [%f, %f] [%f, %f] .\n",

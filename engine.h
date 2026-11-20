@@ -193,6 +193,7 @@ int set_line_bias(int lindex, int which,
 int set_line_transform(int lindex, int which,
                        float xx, float xy, float xz,
                        float yx, float yy, float yz);
+int fix_line_transform(int sindex, int lindex, int which);
 int split_sector(int sindex, int pindex1, int pindex2);
 int join_sectors(int sindex, int lindex);
 int link_sectors(int sindex, int lindex);
