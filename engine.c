@@ -639,8 +639,8 @@ int line_hit(Point *p1, Point *p2,
 
         if(((x >= p1->x && x <= p2->x) ||
             (x >= p2->x && x <= p1->x)) &&
-           ((slope->y > 0.0 && y >= pos->y) ||
-            (slope->y < 0.0 && y <= pos->y))) {
+           ((slope->y > 0.0 && y > pos->y) ||
+            (slope->y < 0.0 && y < pos->y))) {
             /* X intercept is between line points and in front of view */
             hit->x = x;
             hit->y = y;
@@ -674,8 +674,8 @@ int line_hit(Point *p1, Point *p2,
 
         if(((y <= p1->y && y >= p2->y) ||
             (y <= p2->y && y >= p1->y)) &&
-           ((slope->x > 0.0 && x >= pos->x) ||
-            (slope->x < 0.0 && x <= pos->x))) {
+           ((slope->x > 0.0 && x > pos->x) ||
+            (slope->x < 0.0 && x < pos->x))) {
             /* X intercept is between line points and in front of view */
             hit->x = x;
             hit->y = y;
@@ -688,49 +688,56 @@ int line_hit(Point *p1, Point *p2,
     return(0);
 }
  
-int scan_sector(Sector *last_s, Sector *sector,
-                Point *pos, Point *slope,
-                int vvertical, float vslope,
-                Point *hit) {
-    Point *point, *nextpoint;
-    unsigned short lindex;
-    Line *line;
-    int i;
-
-    point = &(*p)[(*l)[sector->firstline].point];
-    for(i = 0; i < sector->lines; i++) {
-        lindex = sector->firstline + i;
-        line = &(*l)[lindex];
-
-        /* current line spans from the current point to the next line point */
-        nextpoint = &(*p)[(*l)[sector->firstline + ((i + 1) % sector->lines)].point];
-
-        /* don't check for lines that would look back towards the previous sector */
-        if(last_s != NULL && &(*s)[line->sector] == last_s) {
-            /* make sure the point used in the next iteration is updated */
-            point = nextpoint;
-            continue;
-        }
-
-        if(line_hit(point, nextpoint,
-                    pos, slope,
-                    vvertical, vslope,
-                    hit)) {
-            return(lindex);
-        }
-
-        point = nextpoint;
-    }
-
-    return(-1);
-}
-
 float get_distance(Point *pos, Point *hit, Point *slope) {
     if(fabs(slope->x) > fabs(slope->y)) {
         return(fabs((pos->x - hit->x) / slope->x));
     }
 
     return(fabs((pos->y - hit->y) / slope->y));
+}
+
+int scan_sector(Sector *sector,
+                Point *pos, Point *slope,
+                int vvertical, float vslope,
+                Point *hit, float *distance) {
+    Point *point, *nextpoint;
+    unsigned short lindex;
+    int i;
+    Point largest_hit;
+    largest_hit.x = pos->x;
+    largest_hit.y = pos->y;
+    float largest_distance = 0.0;
+    float largest_lindex = -1;
+
+    point = &(*p)[(*l)[sector->firstline].point];
+    /* check all lines and find the furthest because checking for a distance of 0.0 isn't
+     * enough because there can be residual differences */
+    for(i = 0; i < sector->lines; i++) {
+        lindex = sector->firstline + i;
+
+        /* current line spans from the current point to the next line point */
+        nextpoint = &(*p)[(*l)[sector->firstline + ((i + 1) % sector->lines)].point];
+
+        if(line_hit(point, nextpoint,
+                    pos, slope,
+                    vvertical, vslope,
+                    hit)) {
+            *distance = get_distance(pos, hit, slope);
+            if(*distance > largest_distance) {
+                largest_hit.x = hit->x;
+                largest_hit.y = hit->y;
+                largest_distance = *distance;
+                largest_lindex = lindex;
+            }
+        }
+
+        point = nextpoint;
+    }
+
+    hit->x = largest_hit.x;
+    hit->y = largest_hit.y;
+    *distance = largest_distance;
+    return(largest_lindex);
 }
 
 void set_tex(unsigned char num,
@@ -762,7 +769,7 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
     Line *s_line = sel_line < 0 ? NULL : &(*l)[sel_line];
     Sector *s_sector = sel_sector < 0 ? NULL : &(*s)[sel_sector];
 #endif
-    Sector *sector, *last_s;
+    Sector *sector;
     float offset;
     Point slope;
     int vvertical;
@@ -770,7 +777,7 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
     int lindex;
     Line *line;
     Point hit;
-    float total_distance;
+    float distance, total_distance;
     int x, y;
     float z;
     float wx, wy, wz;
@@ -838,16 +845,15 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
         }
  
         sector = &(*s)[v.start];
-        last_s = NULL;
         top = 0;
         bottom = height - 1;
         pos.x = v.pos.x;
         pos.y = v.pos.y;
         total_distance = 0.0;
         while (true) {
-            lindex = scan_sector(last_s, sector, &pos,
+            lindex = scan_sector(sector, &pos,
                                  &slope, vvertical, vslope,
-                                 &hit);
+                                 &hit, &distance);
 
             /* shouldn't happen, but in case the ray misses for some reason */
             if(lindex < 0) {
@@ -855,8 +861,7 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
             }
             line = &(*l)[lindex];
 
-            /* get the distance between the view and hit coordinates */
-            total_distance += get_distance(&pos, &hit, &slope);
+            total_distance += distance;
 
             /* iterate y (angle transformed with FOV to get an angle from screen Y) with height
              * from bottom solving for distance until total distance is reached.
@@ -1125,7 +1130,6 @@ void engine_render(unsigned char *pixels, int width, int height, int pitch
             }
 
             /* get sector on other side of the line while keeping note of the last sector so raycasting won't traverse back through it */
-            last_s = sector;
             sector = &(*s)[line->sector];
 
             ceilingdiff = sector->height[CEILING] - v.height;
@@ -1375,7 +1379,7 @@ void engine_move(float x, float y,
     Line *line;
     int sindex;
     Sector *sector;
-    Sector *last_s;
+    float distance;
 
     /* calculate slope values, this doesn't need a planar projection, so just divide rise/run */
     if(fabs(y) > fabs(x)) {
@@ -1396,13 +1400,12 @@ void engine_move(float x, float y,
 
     pos.x = v.pos.x;
     pos.y = v.pos.y;
-    last_s = NULL;
     sindex = v.start;
     sector = &(*s)[sindex];
     while(true) {
-        lindex = scan_sector(last_s, sector, &pos,
+        lindex = scan_sector(sector, &pos,
                              &slope, vvertical, vslope,
-                             &hit);
+                             &hit, &distance);
 
         /* shouldn't happen, but in case the ray misses for some reason */
         if(lindex < 0) {
@@ -1436,7 +1439,6 @@ void engine_move(float x, float y,
         /* update working position and sector */
         pos.x = hit.x;
         pos.y = hit.y;
-        last_s = sector;
         sindex = line->sector;
         sector = &(*s)[sindex];
 
@@ -1514,14 +1516,14 @@ int get_hit(int mx, int my,
             int width, int height,
             int *sindex, int *lindex,
             float *wx, float *wy, float *wz) {
-    Sector *sector, *last_s;
+    Sector *sector;
     Line *line;
     float offset;
     Point slope;
     int vvertical;
     float vslope;
     Point hit;
-    float total_distance;
+    float distance, total_distance;
     int y;
     float z;
     int top, bottom;
@@ -1554,16 +1556,15 @@ int get_hit(int mx, int my,
     line = NULL;
     *sindex = v.start;
     sector = &(*s)[*sindex];
-    last_s = NULL;
     top = 0;
     bottom = height - 1;
     pos.x = v.pos.x;
     pos.y = v.pos.y;
     total_distance = 0.0;
     while (true) {
-        *lindex = scan_sector(last_s, sector, &pos,
+        *lindex = scan_sector(sector, &pos,
                               &slope, vvertical, vslope,
-                              &hit);
+                              &hit, &distance);
 
         /* shouldn't happen, but in case the ray misses for some reason */
         if(*lindex < 0) {
@@ -1571,8 +1572,7 @@ int get_hit(int mx, int my,
         }
         line = &(*l)[*lindex];
 
-        /* get the distance between the view and hit coordinates */
-        total_distance += get_distance(&pos, &hit, &slope);
+        total_distance += distance;
 
         /* iterate y (angle transformed with FOV to get an angle from screen Y) with height
          * from bottom solving for distance until total distance is reached.
@@ -1635,7 +1635,6 @@ int get_hit(int mx, int my,
         }
 
         /* get sector on other side of the line while keeping note of the last sector so raycasting won't traverse back through it */
-        last_s = sector;
         sector = &(*s)[line->sector];
 
         ceilingdiff = sector->height[CEILING] - v.height;
