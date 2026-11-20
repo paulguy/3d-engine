@@ -262,9 +262,9 @@ int check_prompt() {
 }
 
 /* point 0 is the no-bias wall scroll */
-int s_point = 1;
-int s_line = 0;
-int s_sector = 0;
+int s_point;
+int s_line;
+int s_sector;
 
 typedef void (* select_cb_t)(int sindex, int lindex, int pindex);
 
@@ -433,23 +433,24 @@ int parse_shade(char *word, int *shade) {
 
     EAT_SPACES(error)
 
-    if(word[0] == '\n') {
+    if(word[0] == '\0') {
         return(-1);
     } else if(word[0] == 'p' || word[0] == 'P') {
         *shade |= SHADE_PARALLAX;
         word = &word[1];
     }
 
-    if(word[0] == '\n') {
+    if(word[0] == '\0') {
         return(-1);
     } else if(word[0] == '-') {
         *shade |= SHADE_SUB;
         word = &word[1];
     }
 
-    /* shades are 0-3, so base 4 */
+    wordend = word;
+
     GET_LONG(color, error)
-    *shade |= (color & 0x03) | ((color & 0x0C) << 1) | ((color & 0x30) << 2);
+    *shade |= (((color / 100 % 10) & 0x3) << 6) | (((color / 10 % 10) & 0x3) << 3) | ((color % 10) & 0x3);
 
     return(0);
 error:
@@ -523,6 +524,12 @@ void set_sector_transform_cb(float xx, float xy,
     }
 }
 
+void reset_highlights() {
+    s_point = 1;
+    s_line = 0;
+    s_sector = 0;
+}
+
 void prompt_mapnum_cb(char *word) {
     char *wordend = word;
 
@@ -530,6 +537,7 @@ void prompt_mapnum_cb(char *word) {
     GET_LONG(mapnum, error)
 
     fprintf(stderr, "Mapnum set to %hhu.\n", mapnum);
+    reset_highlights();
     engine_load(mapnum, 0);
 error:
 }
@@ -969,6 +977,7 @@ int main(int argc, char **argv) {
     }
 
     SelectionTarget target = SEL_POINT;
+    reset_highlights();
     int h_point = -1;
     int h_line = -1;
     int h_sector = -1;
