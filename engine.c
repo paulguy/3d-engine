@@ -321,19 +321,32 @@ int engine_load(unsigned char number, unsigned char view) {
     if(p != NULL) {
         waypoint = -1;
         free(s);
+        s = NULL;
         free(f);
+        f = NULL;
         free(l);
+        l = NULL;
         free(w);
+        w = NULL;
         free(m32);
+        m32 = NULL;
         free(m22);
+        m22 = NULL;
         free(p);
+        p = NULL;
 #ifdef EDITOR
         free(vs);
+        vs = NULL;
         free(point_refs);
+        point_refs = NULL;
         free(m22_refs);
+        m22_refs = NULL;
         free(m32_refs);
+        m32_refs = NULL;
         free(wall_refs);
+        wall_refs = NULL;
         free(flat_refs);
+        flat_refs = NULL;
 #endif
     }
 
